@@ -1,263 +1,254 @@
 #!/usr/bin/env python3
-"""Generate a spinning mechanical gear GIF for the HOI4-MCP README banner.
+"""Generate spinning mechanical gear GIFs for the HOI4-MCP README banner.
 
-Produces a realistic industrial gear with involute-style tooth profiles,
-face shading, keyway, and metallic gray tones — inspired by mechanical
-gear reference imagery. Output: assets/gear-spin.gif
+Produces two realistic industrial gear variants (left and right) with
+involute-style tooth profiles, directional face shading, keyways, and
+metallic gray tones. Output: assets/gear-left.gif, assets/gear-right.gif
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 
-# ── Configuration ──────────────────────────────────────────────────────────
-SIZE = 240  # px, square canvas
-NUM_TEETH = 16
-OUTER_RADIUS = 88   # tip of teeth
-INNER_RADIUS = 68   # root between teeth
-HUB_RADIUS = 24     # central solid hub
-HOLE_RADIUS = 10    # center bore
-KEYWAY_WIDTH = 5    # keyway slot width
-KEYWAY_DEPTH = 5    # keyway depth beyond hole radius
-RIM_INNER = 52      # inner edge of the outer rim
-NUM_FRAMES = 30
-DURATION = 40       # ms per frame
-PRESSURE_ANGLE = math.radians(22)  # tooth side angle off radial
+# ── Gear configuration ─────────────────────────────────────────────────────
+@dataclass
+class GearConfig:
+    """Parameters for a single gear variant."""
+    size: int            # canvas px (square)
+    num_teeth: int
+    outer_radius: int    # tip of teeth
+    inner_radius: int    # root between teeth
+    hub_radius: int
+    hole_radius: int
+    keyway_width: int
+    keyway_depth: int
+    rim_inner: int       # inner edge of outer rim
+    num_spokes: int
+    direction: int       # 1 = clockwise, -1 = counter-clockwise
+    spoke_phase_offset: float  # radians, for visual variety
 
-# Metallic grays with cool undertone (matches reference)
-BG_FILL = (22, 24, 28, 0)       # near-black, transparent
-STEEL_BASE = (110, 115, 125)     # mid-gray body
-STEEL_DARK = (70, 75, 82)        # shadowed recesses
-STEEL_SHADOW = (50, 54, 60)     # deep shadows
-STEEL_HIGHLIGHT = (160, 165, 175)  # lit faces
-STEEL_TIP = (180, 185, 195)     # tooth tip highlight
-HUB_COLOR = (95, 100, 108)      # hub slightly darker than body
-HUB_RIM = (130, 135, 142)       # hub rim highlight
-BORE_COLOR = (22, 24, 28)       # center hole (matches BG)
+
+# Left gear: larger, 16 teeth, counter-clockwise, 5 spokes
+GEAR_LEFT = GearConfig(
+    size=220, num_teeth=16,
+    outer_radius=80, inner_radius=62,
+    hub_radius=22, hole_radius=9,
+    keyway_width=5, keyway_depth=4,
+    rim_inner=48, num_spokes=5,
+    direction=-1, spoke_phase_offset=0.0,
+)
+
+# Right gear: slightly smaller, 14 teeth, clockwise, 6 spokes
+GEAR_RIGHT = GearConfig(
+    size=200, num_teeth=14,
+    outer_radius=70, inner_radius=54,
+    hub_radius=20, hole_radius=8,
+    keyway_width=4, keyway_depth=4,
+    rim_inner=42, num_spokes=6,
+    direction=1, spoke_phase_offset=math.pi / 6,
+)
+
+NUM_FRAMES = 30
+DURATION = 40  # ms per frame
+
+# ── Metallic palette (cool grays with subtle blue undertone) ───────────────
+BG_FILL = (22, 24, 28, 0)          # near-black, transparent
+STEEL_BASE = (108, 113, 122)       # mid-gray body
+STEEL_DARK = (68, 73, 80)          # shadowed recesses
+STEEL_SHADOW = (48, 52, 58)        # deep shadows
+STEEL_HIGHLIGHT = (158, 163, 172)  # lit faces
+STEEL_TIP = (178, 183, 192)        # tooth tip catch light
+HUB_COLOR = (93, 98, 106)          # hub
+HUB_RIM = (128, 133, 140)          # hub rim highlight
+BORE_COLOR = (22, 24, 28)          # center hole
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 
 # ── Involute-style tooth geometry ──────────────────────────────────────────
 def tooth_corners(
-    cx: float, cy: float, tooth_index: int, total_teeth: int, base_angle: float
+    cx: float, cy: float, tooth_index: int,
+    cfg: GearConfig, base_angle: float,
 ) -> list[tuple[float, float]]:
-    """Return the 4 corners of a trapezoidal tooth.
+    """Return [tip_left, tip_right, root_right, root_left] for a trapezoidal tooth."""
+    pitch = 2 * math.pi / cfg.num_teeth
+    tip_hw = pitch * 0.22
+    root_hw = pitch * 0.28
+    center = base_angle + tooth_index * pitch
 
-    Each tooth has a flat outer tip (arc segment) and angled sides.
-    Returns [tip_left, tip_right, root_right, root_left] in order.
-    """
-    pitch = 2 * math.pi / total_teeth
-    # Tooth occupies ~45% of the pitch at the tip, ~55% at the root
-    tip_half_width = pitch * 0.22   # angular half-width of tooth tip
-    root_half_width = pitch * 0.28  # angular half-width at root
-
-    center_angle = base_angle + tooth_index * pitch
-
-    # Tip corners (outer radius)
     tip_left = (
-        cx + OUTER_RADIUS * math.cos(center_angle - tip_half_width),
-        cy + OUTER_RADIUS * math.sin(center_angle - tip_half_width),
+        cx + cfg.outer_radius * math.cos(center - tip_hw),
+        cy + cfg.outer_radius * math.sin(center - tip_hw),
     )
     tip_right = (
-        cx + OUTER_RADIUS * math.cos(center_angle + tip_half_width),
-        cy + OUTER_RADIUS * math.sin(center_angle + tip_half_width),
+        cx + cfg.outer_radius * math.cos(center + tip_hw),
+        cy + cfg.outer_radius * math.sin(center + tip_hw),
     )
-
-    # Root corners (inner radius, wider base)
     root_right = (
-        cx + INNER_RADIUS * math.cos(center_angle + root_half_width),
-        cy + INNER_RADIUS * math.sin(center_angle + root_half_width),
+        cx + cfg.inner_radius * math.cos(center + root_hw),
+        cy + cfg.inner_radius * math.sin(center + root_hw),
     )
     root_left = (
-        cx + INNER_RADIUS * math.cos(center_angle - root_half_width),
-        cy + INNER_RADIUS * math.sin(center_angle - root_half_width),
+        cx + cfg.inner_radius * math.cos(center - root_hw),
+        cy + cfg.inner_radius * math.sin(center - root_hw),
     )
-
     return [tip_left, tip_right, root_right, root_left]
 
 
-def draw_gear_body(draw: ImageDraw.ImageDraw, cx: float, cy: float, angle: float):
-    """Draw the main gear: teeth, rim, hub, spokes, and bore."""
-    # ── Step 1: Dark under-disk (shadow/base silhouette) ──
+# ── Gear drawing ───────────────────────────────────────────────────────────
+def draw_gear(draw: ImageDraw.ImageDraw, cx: float, cy: float,
+              angle: float, cfg: GearConfig):
+    """Draw a complete gear: teeth, rim, spokes, hub, bore, keyway."""
+    or_ = cfg.outer_radius
+    ir = cfg.inner_radius
+
+    # Shadow disk
     draw.ellipse(
-        [cx - OUTER_RADIUS - 2, cy - OUTER_RADIUS + 1,
-         cx + OUTER_RADIUS + 2, cy + OUTER_RADIUS + 3],
+        [cx - or_ - 2, cy - or_ + 1, cx + or_ + 2, cy + or_ + 3],
         fill=STEEL_SHADOW,
     )
 
-    # ── Step 2: Draw each tooth individually with face shading ──
-    for i in range(NUM_TEETH):
-        corners = tooth_corners(cx, cy, i, NUM_TEETH, angle)
-        tip_left, tip_right, root_right, root_left = corners
-        center_angle = angle + i * (2 * math.pi / NUM_TEETH)
-
-        # Determine which side faces the light (light from upper-left)
-        cos_a = math.cos(center_angle)
-        sin_a = math.sin(center_angle)
-        # Light direction: from top-left (-0.7, -0.7)
-        face_normal = -cos_a * 0.7 - sin_a * 0.7
+    # Teeth with per-face shading
+    for i in range(cfg.num_teeth):
+        corners = tooth_corners(cx, cy, i, cfg, angle)
+        tl, tr, rr, rl = corners
+        center_angle = angle + i * (2 * math.pi / cfg.num_teeth)
+        face_normal = -math.cos(center_angle) * 0.7 - math.sin(center_angle) * 0.7
 
         if face_normal > 0.15:
-            # Tooth faces the light — brighter
             tooth_fill = STEEL_HIGHLIGHT
-            side_fill = STEEL_BASE
         elif face_normal < -0.15:
-            # Tooth faces away — darker
             tooth_fill = STEEL_DARK
-            side_fill = STEEL_SHADOW
         else:
             tooth_fill = STEEL_BASE
-            side_fill = STEEL_DARK
 
-        # Draw tooth body
         draw.polygon(corners, fill=tooth_fill, outline=STEEL_SHADOW)
+        draw.line([tl, tr], fill=STEEL_TIP, width=2)
 
-        # Tip highlight line
-        draw.line([tip_left, tip_right], fill=STEEL_TIP, width=2)
-
-        # Root fill (the valley to the right of this tooth)
-        next_corners = tooth_corners(cx, cy, (i + 1) % NUM_TEETH, NUM_TEETH, angle)
-        valley = [root_right, next_corners[3], next_corners[2], next_corners[1]]
-        # Only fill the valley area
-        draw.polygon(
-            [root_right, next_corners[3],
-             (cx + INNER_RADIUS * 0.98 * math.cos(center_angle + math.pi / NUM_TEETH),
-              cy + INNER_RADIUS * 0.98 * math.sin(center_angle + math.pi / NUM_TEETH))],
-            fill=STEEL_SHADOW,
+        # Valley shadow
+        nc = tooth_corners(cx, cy, (i + 1) % cfg.num_teeth, cfg, angle)
+        valley_mid = (
+            cx + ir * 0.97 * math.cos(center_angle + math.pi / cfg.num_teeth),
+            cy + ir * 0.97 * math.sin(center_angle + math.pi / cfg.num_teeth),
         )
+        draw.polygon([rr, nc[3], valley_mid], fill=STEEL_SHADOW)
 
-    # ── Step 3: Outer rim ring ──
+    # Outer rim ring
     draw.ellipse(
-        [cx - OUTER_RADIUS + 3, cy - OUTER_RADIUS + 3,
-         cx + OUTER_RADIUS - 3, cy + OUTER_RADIUS - 3],
+        [cx - or_ + 3, cy - or_ + 3, cx + or_ - 3, cy + or_ - 3],
         outline=STEEL_DARK, width=2,
     )
 
-    # ── Step 4: Inner rim (recessed area between teeth and hub) ──
+    # Recessed inner rim
     draw.ellipse(
-        [cx - RIM_INNER, cy - RIM_INNER, cx + RIM_INNER, cy + RIM_INNER],
+        [cx - cfg.rim_inner, cy - cfg.rim_inner,
+         cx + cfg.rim_inner, cy + cfg.rim_inner],
         fill=STEEL_DARK,
     )
-    # Inner rim highlight (top edge catches light)
     draw.arc(
-        [cx - RIM_INNER, cy - RIM_INNER, cx + RIM_INNER, cy + RIM_INNER],
+        [cx - cfg.rim_inner, cy - cfg.rim_inner,
+         cx + cfg.rim_inner, cy + cfg.rim_inner],
         start=200, end=340, fill=STEEL_HIGHLIGHT, width=2,
     )
 
-    # ── Step 5: Spokes (5 spokes for industrial look) ──
-    for sp in range(5):
-        spoke_angle = angle * 0.3 + sp * (2 * math.pi / 5)  # spokes rotate slower than teeth
-        inner_r = HUB_RADIUS + 3
-        outer_r = RIM_INNER - 4
+    # Spokes
+    for sp in range(cfg.num_spokes):
+        spoke_angle = (angle * 0.3 * cfg.direction
+                       + cfg.spoke_phase_offset
+                       + sp * (2 * math.pi / cfg.num_spokes))
+        inner_r = cfg.hub_radius + 3
+        outer_r = cfg.rim_inner - 4
+        hw_in = 0.08
+        hw_out = 0.06
 
-        # Each spoke is a tapered trapezoid
-        half_w_inner = 0.08  # angular half-width at hub
-        half_w_outer = 0.06  # angular half-width at rim
-
-        spoke_corners = [
-            (cx + inner_r * math.cos(spoke_angle - half_w_inner),
-             cy + inner_r * math.sin(spoke_angle - half_w_inner)),
-            (cx + inner_r * math.cos(spoke_angle + half_w_inner),
-             cy + inner_r * math.sin(spoke_angle + half_w_inner)),
-            (cx + outer_r * math.cos(spoke_angle + half_w_outer),
-             cy + outer_r * math.sin(spoke_angle + half_w_outer)),
-            (cx + outer_r * math.cos(spoke_angle - half_w_outer),
-             cy + outer_r * math.sin(spoke_angle - half_w_outer)),
+        sc = [
+            (cx + inner_r * math.cos(spoke_angle - hw_in),
+             cy + inner_r * math.sin(spoke_angle - hw_in)),
+            (cx + inner_r * math.cos(spoke_angle + hw_in),
+             cy + inner_r * math.sin(spoke_angle + hw_in)),
+            (cx + outer_r * math.cos(spoke_angle + hw_out),
+             cy + outer_r * math.sin(spoke_angle + hw_out)),
+            (cx + outer_r * math.cos(spoke_angle - hw_out),
+             cy + outer_r * math.sin(spoke_angle - hw_out)),
         ]
-        # Shade based on orientation
-        cos_s = math.cos(spoke_angle)
-        sin_s = math.sin(spoke_angle)
-        spoke_bright = -cos_s * 0.7 - sin_s * 0.7
-        if spoke_bright > 0:
-            spoke_fill = STEEL_BASE
-            spoke_outline = STEEL_SHADOW
-        else:
-            spoke_fill = STEEL_DARK
-            spoke_outline = STEEL_SHADOW
+        bright = -math.cos(spoke_angle) * 0.7 - math.sin(spoke_angle) * 0.7
+        fill = STEEL_BASE if bright > 0 else STEEL_DARK
+        draw.polygon(sc, fill=fill, outline=STEEL_SHADOW)
 
-        draw.polygon(spoke_corners, fill=spoke_fill, outline=spoke_outline)
-
-    # ── Step 6: Hub (solid center) ──
+    # Hub
     draw.ellipse(
-        [cx - HUB_RADIUS, cy - HUB_RADIUS, cx + HUB_RADIUS, cy + HUB_RADIUS],
+        [cx - cfg.hub_radius, cy - cfg.hub_radius,
+         cx + cfg.hub_radius, cy + cfg.hub_radius],
         fill=HUB_COLOR, outline=HUB_RIM, width=2,
     )
-    # Hub face highlight
     draw.arc(
-        [cx - HUB_RADIUS + 3, cy - HUB_RADIUS + 3,
-         cx + HUB_RADIUS - 3, cy + HUB_RADIUS - 3],
+        [cx - cfg.hub_radius + 3, cy - cfg.hub_radius + 3,
+         cx + cfg.hub_radius - 3, cy + cfg.hub_radius - 3],
         start=200, end=340, fill=STEEL_HIGHLIGHT, width=2,
     )
 
-    # ── Step 7: Center bore with keyway ──
+    # Bore + keyway
     draw.ellipse(
-        [cx - HOLE_RADIUS, cy - HOLE_RADIUS, cx + HOLE_RADIUS, cy + HOLE_RADIUS],
+        [cx - cfg.hole_radius, cy - cfg.hole_radius,
+         cx + cfg.hole_radius, cy + cfg.hole_radius],
         fill=BORE_COLOR, outline=STEEL_SHADOW, width=2,
     )
-    # Keyway slot (rectangular notch at top of bore)
-    kw_x1 = cx - KEYWAY_WIDTH / 2
-    kw_x2 = cx + KEYWAY_WIDTH / 2
-    kw_y1 = cy - HOLE_RADIUS - KEYWAY_DEPTH
-    kw_y2 = cy - HOLE_RADIUS
-    # Rotate keyway with gear
-    kw_angle = angle
-    kw_corners_rot = []
+    kw_x1 = cx - cfg.keyway_width / 2
+    kw_x2 = cx + cfg.keyway_width / 2
+    kw_y1 = cy - cfg.hole_radius - cfg.keyway_depth
+    kw_y2 = cy - cfg.hole_radius
+    kw_corners = []
     for kx, ky in [(kw_x1, kw_y1), (kw_x2, kw_y1), (kw_x2, kw_y2), (kw_x1, kw_y2)]:
         dx, dy = kx - cx, ky - cy
-        rx = cx + dx * math.cos(kw_angle) - dy * math.sin(kw_angle)
-        ry = cy + dx * math.sin(kw_angle) + dy * math.cos(kw_angle)
-        kw_corners_rot.append((rx, ry))
-    draw.polygon(kw_corners_rot, fill=BORE_COLOR, outline=STEEL_SHADOW, width=1)
+        rx = cx + dx * math.cos(angle) - dy * math.sin(angle)
+        ry = cy + dx * math.sin(angle) + dy * math.cos(angle)
+        kw_corners.append((rx, ry))
+    draw.polygon(kw_corners, fill=BORE_COLOR, outline=STEEL_SHADOW, width=1)
 
-    # ── Step 8: Outer rim edge highlight (catches light on top-left) ──
-    highlight_arc_r = OUTER_RADIUS - 1
+    # Outer highlight arc
+    har = or_ - 1
     draw.arc(
-        [cx - highlight_arc_r, cy - highlight_arc_r,
-         cx + highlight_arc_r, cy + highlight_arc_r],
+        [cx - har, cy - har, cx + har, cy + har],
         start=210, end=330, fill=STEEL_TIP, width=2,
     )
 
 
-# ── Frame generation ───────────────────────────────────────────────────────
-def make_frame(angle: float) -> Image.Image:
-    """Render one gear frame at the given rotation angle."""
-    img = Image.new("RGBA", (SIZE, SIZE), BG_FILL)
+# ── Frame / GIF generation ─────────────────────────────────────────────────
+def make_frame(cfg: GearConfig, angle: float) -> Image.Image:
+    """Render one frame."""
+    img = Image.new("RGBA", (cfg.size, cfg.size), BG_FILL)
     draw = ImageDraw.Draw(img)
-    cx = cy = SIZE / 2
-    draw_gear_body(draw, cx, cy, angle)
+    draw_gear(draw, cfg.size / 2, cfg.size / 2, angle, cfg)
     return img
 
 
-def generate_gear_gif(output_path: Path) -> None:
-    """Generate the full spinning gear GIF."""
+def generate_gear_gif(cfg: GearConfig, output_path: Path, label: str) -> None:
+    """Generate a looping gear GIF."""
     frames: list[Image.Image] = []
-    angle_step = (2 * math.pi) / NUM_FRAMES
+    angle_step = (2 * math.pi) / NUM_FRAMES * cfg.direction
 
     for i in range(NUM_FRAMES):
         angle = i * angle_step
-        frame = make_frame(angle)
-        frames.append(frame)
+        frames.append(make_frame(cfg, angle))
 
     frames[0].save(
         str(output_path),
-        save_all=True,
-        append_images=frames[1:],
-        duration=DURATION,
-        loop=0,
-        disposal=2,
-        transparency=0,
-        optimize=False,
+        save_all=True, append_images=frames[1:],
+        duration=DURATION, loop=0, disposal=2,
+        transparency=0, optimize=False,
     )
-    print(f"✅ Generated {output_path} ({NUM_FRAMES} frames, {SIZE}×{SIZE}px)")
+    print(f"✅ {label}: {output_path} ({NUM_FRAMES}f, {cfg.size}×{cfg.size}px, "
+          f"{cfg.num_teeth}t, {cfg.num_spokes}s)")
 
 
+# ── Main ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    output = ASSETS_DIR / "gear-spin.gif"
-    generate_gear_gif(output)
+    generate_gear_gif(GEAR_LEFT, ASSETS_DIR / "gear-left.gif", "Left gear")
+    generate_gear_gif(GEAR_RIGHT, ASSETS_DIR / "gear-right.gif", "Right gear")
 
