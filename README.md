@@ -26,6 +26,8 @@
   <img src="https://img.shields.io/badge/Events_&_Decisions-3D4F3F?style=flat-square&logoColor=F0E6D2" />
   <img src="https://img.shields.io/badge/Map-Modding-263248?style=flat-square&logoColor=D4A574" />
   <br/>
+  <img src="https://img.shields.io/github/downloads/cpntodd/HOI4-MCP/total?style=flat-square&color=C9A84C&labelColor=1A1F2E" />
+  <br/>
   <img src="https://img.shields.io/badge/python-3.10+-1A1F2E?style=flat-square&logo=python&logoColor=F0E6D2" />
   <img src="https://img.shields.io/badge/license-GPL--3.0-C9A84C?style=flat-square" />
   <img src="https://img.shields.io/badge/MCP-1.0+-3D4F3F?style=flat-square" />
