@@ -31,6 +31,12 @@ Thumbs.db
 *.db-wal
 *.db-shm
 
+# Working documents (audit/proposal files generated during sessions)
+*-AUDIT.md
+*-PROPOSAL.md
+INDEXER-GAP-*.md
+PARSER-*.md
+
 # Test
 .pytest_cache/
 .coverage

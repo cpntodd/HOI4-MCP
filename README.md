@@ -133,7 +133,6 @@ Next session: get_learned_rules() → rule loaded → mistake PREVENTED
 | **[Setup Guide](docs/SETUP.md)** | Prerequisites, installation, vanilla DB build, VS Code config, troubleshooting |
 | **[Usage Guide](docs/USAGE.md)** | Tool reference, common workflows, agent integration, skill loading, testing |
 | **[Test Results](TEST-RESULTS.md)** | Comprehensive benchmarks across 6 reference mods + vanilla game |
-| **[Project Audit](PROJECT-AUDIT.md)** | 25-gap analysis, implementation status, action plan |
 
 ---
 
@@ -176,7 +175,6 @@ HOI4-MCP/
 ├── hoi4-modder.agent.md         # AI agent persona + 4-phase workflow
 ├── SKILL.md                     # HOI4 syntax reference (18 systems, 1,800+ lines)
 ├── AGENTS.md                    # Project-wide conventions
-├── PROJECT-AUDIT.md             # 25-gap analysis + action plan
 ├── TEST-RESULTS.md              # Benchmarks across 6 reference mods
 ├── docs/                        # Documentation
 │   ├── SETUP.md                 # Setup guide
