@@ -1,21 +1,23 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1A1F2E,263248,3D4F3F,C9A84C&height=220&section=header&text=HOI4-MCP&fontSize=58&fontColor=F0E6D2&fontAlignY=40&desc=AI-assisted%20HOI4%20modding%20framework&descSize=16&descAlignY=62&descFontColor=D4A574&animation=fadeIn" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1A1F2E,263248,3D4F3F,C9A84C&height=140&section=header&fontSize=0&animation=fadeIn" />
+  <br/>
+  <img src="assets/banner-title.png" width="640" alt="HOI4-MCP" />
 </div>
 
-<table align="center" border="0" cellpadding="8" cellspacing="0">
+<table align="center" border="0" cellpadding="6" cellspacing="0">
   <tr>
-    <td align="center" valign="middle" width="140">
-      <img src="assets/gear-left.gif" width="120" alt="Spinning gear" />
+    <td align="center" valign="middle" width="150">
+      <img src="assets/gear-cluster-left.gif" width="140" alt="Gear cluster" />
     </td>
     <td align="center" valign="middle">
-      <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1800&color=C9A84C&center=true&vCenter=true&width=520&lines=%E2%9A%92+Forge+ironclad+focus+trees;%F0%9F%97%BA+Script+the+fate+of+nations;%E2%9A%94+Wage+war+on+boilerplate+code;%F0%9F%94%A7+Zero+hallucinations.+Deterministic+results." />
+      <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1800&color=C9A84C&center=true&vCenter=true&width=460&lines=%E2%9A%92+Forge+ironclad+focus+trees;%F0%9F%97%BA+Script+the+fate+of+nations;%E2%9A%94+Wage+war+on+boilerplate+code;%F0%9F%94%A7+Zero+hallucinations.+Deterministic+results." />
       <br/>
       <sub><b>MCP server</b> • <b>Agent skills</b> • <b>Clausewitz parser</b> • <b>Adaptive learning</b></sub>
       <br/>
       <sub>Turns any AI coding assistant into a Hearts of Iron IV modding expert — deterministic data, zero hallucinations, compounding knowledge.</sub>
     </td>
-    <td align="center" valign="middle" width="130">
-      <img src="assets/gear-right.gif" width="110" alt="Spinning gear" />
+    <td align="center" valign="middle" width="150">
+      <img src="assets/gear-cluster-right.gif" width="140" alt="Gear cluster" />
     </td>
   </tr>
 </table>
