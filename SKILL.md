@@ -1120,6 +1120,69 @@ ideologies = {
 
 ---
 
+## Map Modding
+<!-- GAP-015:COMPLETED — Map Modding section -->
+
+### File Location
+`map/` directory — the most error-prone modding domain. A single mistake in province IDs, RGB colors, or state definitions can cause CTDs or silent map corruption.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `definition.csv` | Province ID → RGB color → terrain type mapping. Format: `id;R;G;B;type;is_coastal;continent;terrain` |
+| `provinces.bmp` | RGB-color-indexed bitmap. Each pixel's color must match exactly ONE province in definition.csv |
+| `default.map` | Defines sea provinces, lakes, max province count |
+| `adjacencies.csv` | Province adjacency overrides (straits, canals, impassable borders) |
+| `positions.txt` | Unit/building position coordinates per province |
+| `strategicregions/` | Strategic region definitions (provinces list, name, naval access) |
+| `supplyareas/` | Supply area definitions |
+| `weatherpositions.txt` | Weather effect coordinates |
+| `continent.txt` | Continent definitions and groupings |
+
+### Province Definition (`definition.csv`)
+```
+<province_id>;<R>;<G>;<B>;<terrain_type>;<is_coastal>
+```
+- **Province IDs must be unique** and sequential. Gaps cause errors.
+- **RGB colors must be unique**. Duplicate RGB = silent province overwrite (use `generate_province_rgb` MCP tool).
+- **Terrain types**: `plains`, `forest`, `hills`, `mountain`, `desert`, `marsh`, `jungle`, `urban`.
+- **`is_coastal`**: 1 = coastal (can build naval bases), 0 = inland.
+
+### RGB Requirements (`provinces.bmp`)
+- **Format**: 24-bit BMP, indexed by color.
+- **Every pixel RGB must match exactly ONE province** in definition.csv.
+- **No anti-aliased edges** at province borders — each pixel must be a pure, exact RGB value.
+- **Sea provinces** must use the RGB defined in `default.map` for ocean/lake colors.
+
+### Strategic Region (`strategicregions/<name>.txt`)
+```
+strategic_region = {
+    id = <int>
+    name = "<LOC_KEY>"
+    provinces = { <id1> <id2> ... }
+    naval_access = yes/no       # can ships enter?
+    static_modifiers = { ... }  # weather, terrain modifiers
+    weather = { ... }           # seasonal weather patterns
+}
+```
+
+### Key Rules
+- **Province IDs and RGBs are a bijection**: one-to-one mapping. Never duplicate either.
+- **Provinces must be contiguous within strategic regions**: no isolated pockets.
+- **Supply areas** must cover all land provinces. Gaps = no supply = divisions starve.
+- **Naval bases require coastal provinces**: `is_coastal = 1` in definition.csv.
+- **Map changes require cache clearing**: delete `~/.paradox/Hearts of Iron IV/map_cache/` after edits.
+
+### Common Pitfalls
+- **Duplicate RGB colors**: Two provinces share the same color → one silently replaced by the other. Use `generate_province_rgb` to find unused colors.
+- **RGB in provinces.bmp doesn't match definition.csv**: Province is invisible/unclickable in-game.
+- **Missing province in any state**: Province exists but isn't assigned to any state → game crash on load.
+- **Non-contiguous strategic region**: Can cause AI pathing issues and supply routing bugs.
+- **Map cache not cleared**: Game uses stale cached map data, showing old province borders.
+
+---
+
 ## Vanilla Modifier Reference
 
 Commonly used vanilla modifiers for national spirits, ideas, leader traits, and focus rewards.
