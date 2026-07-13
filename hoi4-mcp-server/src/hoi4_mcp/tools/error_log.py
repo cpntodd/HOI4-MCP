@@ -86,8 +86,16 @@ class ErrorLog:
 # ---------------------------------------------------------------------------
 
 def find_error_log() -> Path | None:
-    """Locate the HOI4 error.log file based on OS."""
+    """Locate the HOI4 error.log file based on OS or HOI4_ERROR_LOG env var."""
+    import os as _os
     import platform
+
+    # GAP-007: Check env var first
+    env_path = _os.environ.get("HOI4_ERROR_LOG", "")
+    if env_path:
+        p = Path(env_path)
+        if p.exists():
+            return p
 
     system = platform.system()
     home = Path.home()

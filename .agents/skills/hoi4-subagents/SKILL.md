@@ -1,17 +1,27 @@
 ---
 name: hoi4-subagents
-description: Use when coordinating custom Codex subagents for HOI4 mod implementation, asset production, text and audio research, audits, active small patches, planning handoffs, or documentation work.
+description: Use when splitting HOI4 mod implementation, asset production, text and audio research, audits, active small patches, planning handoffs, or documentation work across specialized checks — either via subagents (Codex) or inline checklists (all platforms).
 ---
+<!-- GAP-017:COMPLETED — Platform-agnostic rewrite -->
 
-# HOI4 Subagents
+# HOI4 Subagents & Specialized Checks
 
-Use this skill when a HOI4 modding task should be split across custom Codex subagents.
+Use this skill when a HOI4 modding task should be split across specialized workers.
 
-The parent Codex agent remains responsible for final integration, validation, and completion claims. Subagents can inspect, patch, create assets, write addenda, or produce reports. The parent must review their outputs, wire final cross-surface behavior, and carry blockers into the final report.
+## Platform Support
 
-Do not use subagents to hide uncertainty or pass off responsibility. A subagent handoff is evidence for the parent, not a replacement for parent review.
+| Platform | Mechanism |
+|----------|-----------|
+| **Codex** | Spawn custom subagents via TOML definitions in `.codex/agents/` |
+| **DeepSeek, Claude, Z.AI, other** | Execute the specialized checks **inline** using the checklists in `.agents/checklists/` — no subagent spawning needed |
 
-## Fork context rule
+The parent agent remains responsible for final integration, validation, and completion claims. Specialized workers (subagents or inline checks) can inspect, patch, create assets, write addenda, or produce reports. The parent must review their outputs, wire final cross-surface behavior, and carry blockers into the final report.
+
+Do not use subagents or checklists to hide uncertainty or pass off responsibility. A specialized check is evidence for the parent, not a replacement for parent review.
+
+## Codex-Specific: Subagent Spawning
+
+### Fork context rule
 
 All custom Codex subagents must be spawned with `fork_context=false`.
 
@@ -283,3 +293,44 @@ Before final completion, the parent should check:
 - docs, specs, plans, and any explicitly scoped external records agree
 
 A subagent patch can reduce workload. It never owns the final completion claim.
+
+## Platform-Agnostic: Inline Checklists (All Platforms)
+<!-- GAP-017:COMPLETED -->
+
+When using DeepSeek, Claude, Z.AI, or any non-Codex platform, **execute the specialized checks inline**. Each `.codex/agents/*.toml` has a companion checklist in `.agents/checklists/*.md` that captures:
+
+1. **Purpose:** What this specialized check does
+2. **Checklist:** Exact items to verify (executable inline by the parent agent)
+3. **Common issues:** Known failure patterns
+4. **Output format:** What the result should look like
+
+### How to Use Checklists
+
+1. Determine which specialized check is needed (e.g., "audit focus trees")
+2. Read the corresponding `.agents/checklists/hoi4_focus_tree_auditor.md`
+3. Execute each checklist item yourself — read the relevant files, verify each point
+4. Report findings in the format specified by the checklist
+5. The parent agent integrates findings and makes final decisions
+
+### Checklist Inventory
+
+| Checklist | When to Use |
+|-----------|-------------|
+| `hoi4_focus_tree_auditor.md` | Auditing focus route logic, prerequisites, AI, icons, localisation |
+| `hoi4_decision_mission_auditor.md` | Auditing decisions, missions, costs, tooltips, AI behavior |
+| `hoi4_country_package_auditor.md` | Auditing tags, states, leaders, flags, parties, focus loading |
+| `hoi4_localisation_auditor.md` | Auditing localisation keys, scripted loc, tooltips, dynamic text |
+| `hoi4_scripted_system_architect.md` | Creating reusable scripted effects/triggers/constants |
+| `hoi4_feature_completion_auditor.md` | Comparing specs vs implementation, flagging missing mechanics |
+| `hoi4_repo_explorer.md` | Mapping files, patterns, vanilla precedents, edit order |
+| `hoi4_improvement_loop_planner.md` | Writing deep expansion addenda |
+| `hoi4_documentation_curator.md` | Reconciling specs, plans, handoffs, manifests, READMEs |
+| `hoi4_asset_source_researcher.md` | Finding/verifying/processing real archival images |
+| `hoi4_generated_feature_art.md` | Generating fictional/symbolic art |
+| `hoi4_icon_artist.md` | Creating generated icon packages |
+| `hoi4_quote_remark_researcher.md` | Finding/verifying quotes, cultural remarks, slogans |
+| `hoi4_audio_researcher.md` | Researching licensed/public-domain audio |
+| `hoi4_skill_maintainer.md` | Creating/updating/auditing skill files |
+| `hoi4_spreadsheet_doc_worker.md` | Updating mod-maintained CSV/XLSX tables |
+
+This is the same knowledge as the `.codex/agents/*.toml` files — just in a format any AI agent can execute.

@@ -2,7 +2,10 @@
 name: hoi4-modding-reference
 description: "Use when: need detailed HOI4 modding syntax reference — focus tree structure, event scripting, decision templates, national spirit modifiers, technology trees, OOB format, GUI definitions, localisation YML format, map file specs, AI strategy plans, scripted effects/triggers, or debugging workflows. HOI4, Hearts of Iron IV, Clausewitz, Paradox modding reference."
 user-invocable: true
+last_updated: "2026-07-13"
+game_version: "1.15.x"
 ---
+<!-- GAP-016:COMPLETED — Version tracking added -->
 # HOI4 Modding Syntax Reference
 
 Detailed syntax patterns, gotchas, and file format specifications for Hearts of Iron IV modding. Load this when the agent needs precise syntax for a specific task type.
@@ -568,6 +571,88 @@ state = {
 - **Buildings use levels**: Infrastructure is 1-10, most factories are 1-20. Max level depends on state category.
 - **Province IDs must match `map/definition.csv`**: Mismatched IDs cause errors.
 - **Manpower scales by state category**: Metropolitan states: 1M+, towns: 100K-1M, rural: <100K. Check vanilla state files for reference values.
+
+---
+
+## Technology Trees
+<!-- GAP-015:PARTIAL — Technology Trees section added. Remaining: Equipment, Map, Scripted GUI, MIOs, BOP, AI Strategies, Ideology, Cosmetic Tags, Country Creation, Faction, Intelligence Agency, Namelist -->
+
+### File Location
+`common/technology/<name>.txt`
+
+### Structure
+```
+technologies = {
+    <tech_key> = {
+        # Research
+        enable_tech_sharing = yes  # optional
+        start_year = <int>
+        folder = {
+            name = <folder_name>
+            position = { x = <int> y = <int> }
+        }
+        
+        # Categories
+        categories = {
+            <category_name>
+        }
+        
+        # Cost
+        research_cost = <float>
+        base_cost = <float>  # optional, overrides research_cost for base cost
+        
+        # Prerequisites
+        prerequisites = { <tech1> <tech2> }
+        
+        # Effects on completion
+        on_research_complete = {
+            <effects>
+        }
+        
+        # AI behavior
+        ai_will_do = {
+            factor = <float>
+            modifier = {
+                factor = <float>
+                <triggers>
+            }
+        }
+        
+        # Optional: mutually exclusive
+        mutually_exclusive = { <other_tech> }
+        
+        # Optional: DLC requirement
+        allow = {
+            has_dlc = "<dlc_name>"
+        }
+    }
+}
+```
+
+### Key Rules
+- **`start_year`**: Year the tech becomes available. Before this year, a -50% research penalty applies per year ahead of time.
+- **`folder`**: Organizes techs in the UI tree. Position is relative within the folder.
+- **`categories`**: Assigns techs to research categories (e.g., `infantry_weapons`, `industry`, `air_doctrine`). Categories are defined separately.
+- **`prerequisites`**: Simple list of tech keys. No OR logic — all prerequisites must be completed. Use `any_scope` or multiple tech entries for branching prerequisites.
+- **`research_cost`**: Base days to research. Modified by research speed bonuses.
+- **`on_research_complete`**: Effects that fire when research finishes. Use for unlocking equipment, enabling units, adding ideas.
+- **`mutually_exclusive`**: Used for doctrine paths (e.g., Mobile Warfare vs Superior Firepower). Put on EACH mutually exclusive tech.
+- **Doctrine trees**: Use `folder` groups and `mutually_exclusive` to create branching doctrine paths.
+
+### Technology Categories
+Defined in `common/technology_tags/`:
+```
+<category> = {
+    name = <localisation>
+    sprite = <gfx_index>
+}
+```
+
+### Common Pitfalls
+- **Missing prerequisites**: A tech with `prerequisites = { tech_a }` where `tech_a` doesn't exist anywhere.
+- **Circular prerequisites**: Tech A requires Tech B which requires Tech A — game hangs.
+- **Wrong start_year**: Setting `start_year` too early makes the tech researchable in 1936 at full speed.
+- **No `ai_will_do`**: Without AI weights, AI picks techs randomly, often ignoring critical military techs.
 
 ---
 

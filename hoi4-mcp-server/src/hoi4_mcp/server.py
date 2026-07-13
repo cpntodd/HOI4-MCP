@@ -185,6 +185,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
     async def get_mod_index(
         summary_only: bool = False,
         refresh: bool = False,
+        category: str = "",
     ) -> list[TextContent]:
         """Returns a comprehensive JSON index of the active HOI4 mod.
 
@@ -199,6 +200,10 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             summary_only: If true, returns only counts and namespaces (no full index).
                           Use when you just need a quick overview or after edits.
             refresh: If true, rebuilds the index from disk (use after editing mod files).
+            category: Optional — return only one section: events, focuses, focus_trees,
+                      decisions, ideas, characters, technologies, scripted_effects,
+                      scripted_triggers, on_actions, localisation, namespaces.
+                      Empty = all sections (GAP-003).
 
         Requires: --mod-path to be set when launching the server.
         """
@@ -215,6 +220,18 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             _invalidate_mod_caches()
 
         index = _get_mod_index()
+
+        # GAP-003: Category filter for large mods
+        _valid_categories = {
+            "events", "focuses", "focus_trees", "decisions", "ideas",
+            "characters", "technologies", "scripted_effects", "scripted_triggers",
+            "on_actions", "localisation", "namespaces",
+        }
+        if category and category not in _valid_categories:
+            return [TextContent(
+                type="text",
+                text=f"Error: Invalid category '{category}'. Use one of: {', '.join(sorted(_valid_categories))}"
+            )]
 
         if summary_only:
             summary = {
@@ -238,6 +255,33 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             return [TextContent(
                 type="text",
                 text=json.dumps(summary, indent=2, default=str)
+            )]
+
+        # Category-filtered response (GAP-003)
+        if category:
+            if category == "localisation":
+                result = {
+                    "mod_name": index.get("mod_name", "unknown"),
+                    "category": category,
+                    "localisation_keys": sorted(index.get("localisation_keys", [])),
+                    "localisation_key_count": index.get("localisation_key_count", 0),
+                }
+            elif category == "namespaces":
+                result = {
+                    "mod_name": index.get("mod_name", "unknown"),
+                    "category": category,
+                    "namespaces": index.get("namespaces", []),
+                }
+            else:
+                result = {
+                    "mod_name": index.get("mod_name", "unknown"),
+                    "category": category,
+                    "data": index.get(category, {}),
+                    "count": len(index.get(category, {})),
+                }
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, default=str)
             )]
 
         # Full index response
@@ -1182,6 +1226,11 @@ def main() -> None:
         "--auto-detect-mod",
         action="store_true",
         help="Auto-detect the mod path from the current working directory (looks for descriptor.mod).",
+    )
+    parser.add_argument(
+        "--error-log-path",
+        help="Path to the HOI4 error.log file (overrides auto-detection).",
+        default=os.environ.get("HOI4_ERROR_LOG", None),
     )
     parser.add_argument(
         "--report",

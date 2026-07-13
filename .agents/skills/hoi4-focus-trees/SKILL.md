@@ -4,6 +4,9 @@ description: Use when designing, implementing, auditing, or fixing Hearts of Iro
 ---
 
 # HOI4 Focus Trees
+<!-- GAP-021:COMPLETED -->
+**Depends on:** `hoi4-events` (focuses fire events) · `hoi4-feature-assets` (focus icons, GFX)
+**Depended on by:** `hoi4-decisions-missions` · `hoi4-feature-planning`
 
 Use this skill when a task touches national focus trees, focus-tree loading, focus effects, focus layout, focus localisation, focus icons, focus AI, focus-tree documentation, or feature-created country trees.
 

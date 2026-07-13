@@ -4,6 +4,9 @@ description: Use when creating, sourcing, processing, converting, organizing, wi
 ---
 
 # HOI4 Feature Assets
+<!-- GAP-021:COMPLETED -->
+**Depends on:** `hoi4-frame-animation` (animated sprites) · `hoi4-text-audio-research` (source material)
+**Depended on by:** `hoi4-events` · `hoi4-focus-trees` · `hoi4-decisions-missions` (all need GFX)
 
 Use this skill when a HOI4 modding task requires final visual assets.
 

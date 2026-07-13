@@ -4,6 +4,9 @@ description: Use when recursively deepening HOI4 mod mechanics, events, focus tr
 ---
 
 # HOI4 Improvement Loop
+<!-- GAP-021:COMPLETED -->
+**Depends on:** `hoi4-feature-planning` (spec to improve against) · `hoi4-events` · `hoi4-focus-trees` · `hoi4-decisions-missions`
+**Depended on by:** None (terminal improvement pass)
 
 Use this skill for loop improvement of features and feature-adjacent systems when a feature works, has a draft, or has an audit result, but the design still feels thin, generic, disconnected, static, or too small for the idea.
 
@@ -30,6 +33,67 @@ Good improvement changes play. It does not only add size.
 ## When to use it
 
 Use this skill during implementation or audit when a system feels technically present but thin.
+
+<!-- GAP-020:COMPLETED — Concrete Quick Start example -->
+## Quick Start: Improvement Pass Template
+
+Here is a minimal example of taking a thin mechanic and producing an expansion spec.
+
+### Input: Thin Mechanic
+```
+"Playable Bulgaria with a focus tree about the Balkan Federation.
+Currently: 14 focuses, 3 political branches (fascist/communist/democratic),
+1 industrial branch. Decisions: 'Propose Balkan Federation' (150 PP, requires
++50 opinion with all Balkan neighbors)."
+```
+
+### Output: Expansion Spec (abbreviated)
+```
+## Balkan Federation — Improvement Pass
+
+### What's Missing
+- No AI behavior on any branch (AI picks focuses randomly)
+- Federation decision is a single PP purchase — no buildup, no risk, no drama
+- No reaction events from neighbors (they just silently accept/reject)
+- No failure state or partial success
+- No visual feedback (map changes, flags, news events)
+
+### Expansion Plan
+
+#### 1. Federation Escalation Ladder (replaces single decision)
+- **Phase 1: Cultural Diplomacy** — 3 decisions that cost PP + time.
+  Each adds opinion and a temporary spirit to a neighbor.
+- **Phase 2: Economic Integration** — Requires Phase 1 complete on ≥2 neighbors.
+  Unlocks decisions for trade deals, infrastructure links, resource rights.
+- **Phase 3: Political Union** — Requires Phase 2 complete on ≥3 neighbors.
+  The original federation proposal, now with consequences.
+
+#### 2. Neighbor Reaction System
+- Each phase triggers a hidden event on the target country.
+- AI response weighted by: opinion, ideology, threat, faction membership.
+- Rejection during Phase 2+ triggers a crisis event chain.
+- Acceptance adds a "Balkan Cooperation" national spirit to the neighbor.
+
+#### 3. AI Behavior
+- ai_will_do on political branches: historical path weighted by ideology support.
+- AI Bulgaria: 70% chance to pursue federation if democratic/communist, 10% if fascist.
+- AI neighbors: response weights per ideology block.
+
+#### 4. Visual Support
+- 3 news event pictures (proposal, signing, crisis)
+- Custom Balkan Federation flag (unlocked on formation)
+- Map color change on federation formation
+- Decision category icon
+
+### Acceptance Criteria
+- [ ] Player must complete at least 2 phases before federation proposal
+- [ ] At least 1 neighbor rejects per campaign (no guaranteed success)
+- [ ] AI Bulgaria successfully forms federation in ~30% of observer games
+- [ ] All text has localisation, all GFX paths exist
+```
+
+This template shows the expected depth. Adapt the sections to the specific mechanic being improved.
+<!-- GAP-020:END -->
 
 Common triggers:
 

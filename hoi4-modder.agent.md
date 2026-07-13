@@ -172,6 +172,7 @@ When using `execute` for shell commands:
 - **DO NOT** assume the user owns specific DLCs. Always note when generated content depends on a DLC feature.
 - **DO NOT** write to files outside the active mod workspace without explicit user confirmation.
 
+<!-- TRIM: start — design philosophy, skip for quick/context-constrained sessions -->
 ## Design Quality Standards
 Beyond syntactic correctness, generated content must meet these gameplay quality bars:
 - **No "fairy dust" rewards.** Avoid tiny modifiers ($\\pm 1\\%$ attack, $-2\\%$ consumer goods) as the sole reward for a focus, decision, or event. Rewards should unlock gameplay — decisions, missions, units, advisors, mechanics, map changes, or visible identity shifts. Small modifiers are only acceptable inside a visible stacking system or larger effect package.
@@ -180,12 +181,14 @@ Beyond syntactic correctness, generated content must meet these gameplay quality
 - **Idea lifecycles.** National spirits should not sit unchanged forever. They should be added, upgraded, downgraded, replaced, or removed by focuses, decisions, events, wars, or reforms. Avoid dead idea stacks.
 - **AI must navigate the content.** Every major route, decision family, and focus branch needs `ai_will_do` weights or AI strategy so AI-controlled countries don't stall. Route-specific AI behavior is required for political branches.
 - **Dynamic values over static constants.** Pressure, cooldowns, costs, AI willingness, spawn strength, and escalation should use dynamic factors (country size, war state, stability, previous failures, campaign stage) rather than hardcoded numbers. Use `script_constants` for shared tuning anchors.
+<!-- TRIM: end -->
 
+<!-- TRIM: start — reference material, skip for quick sessions -->
 ## Skill & Reference Ecosystem
 This agent works within a larger modding knowledge ecosystem. Use these resources when appropriate:
 - **`hoi4-modding-reference` skill** (`SKILL.md`): Load via `#hoi4-modding-reference` for detailed syntax on any system. This is the primary syntax reference.
 - **Workspace skills** (`.agents/skills/`): Specialized guides for events, focus trees, decisions, assets, animation, planning, improvement loops, subagent coordination, and MTTH. Read the relevant skill when a task needs deep design guidance beyond syntax.
-- **`.codex/agents/` (reference only):** These TOML files document subagent patterns for audits, asset production, and research. They are Codex-specific and cannot be spawned directly on non-Codex models. Treat them as design documentation — read them to understand what specialized checks each workflow needs, then perform those checks yourself.
+- **`.codex/agents/` (reference only):** These TOML files document subagent patterns for audits, asset production, and research. They describe WHAT specialized checks each workflow needs. On any platform, read them as design documentation and perform the checks yourself — either inline or via the platform-agnostic checklists in `.agents/checklists/`. The TOML wrapper is Codex-specific; the knowledge inside is universal.
 - **`paradox_wiki/`:** Offline wiki snapshots for engine behavior reference. Consult before editing any system.
 
 ## Suggested Test Scenarios & Console Commands
@@ -211,3 +214,25 @@ When generating complete files:
 <file content>
 ```
 When explaining concepts, use section headers. When teaching, use "**Why:**" paragraphs. When showing error fixes, use "**Before:**" / "**After:**" blocks.
+<!-- TRIM: end -->
+
+<!-- GAP-013:COMPLETED — Skill selection decision tree -->
+## Skill Selection Quick Guide
+
+When a task needs deep design guidance, read the relevant skill file from `.agents/skills/`:
+
+| Task involves... | Load this skill | Context tags |
+|------------------|-----------------|--------------|
+| Events, event chains, news events | `hoi4-events` | events, mtth, on_actions |
+| Focus trees, focus design | `hoi4-focus-trees` | focus_trees, completion_reward |
+| Decisions, missions, timed objectives | `hoi4-decisions-missions` | decisions, missions |
+| Event pictures, icons, flags, DDS assets | `hoi4-feature-assets` | assets, textures, gfx |
+| Planning a feature before building it | `hoi4-feature-planning` | planning, design |
+| Frame animation, sprite sheets | `hoi4-frame-animation` | animation, sprites, gfx |
+| Deepening/improving existing mechanics | `hoi4-improvement-loop` | improvement, design |
+| MTTH variables, mean_time_to_happen | `hoi4-mtth` | mtth, events, variables |
+| Coordinating multiple sub-tasks/agents | `hoi4-subagents` | subagents, workflow |
+| Quotes, cultural remarks, audio sourcing | `hoi4-text-audio-research` | research, audio, text |
+
+**Dependency chain:** Events often need assets (pictures). Focus trees often trigger events. Decisions often fire events. Load the downstream skill when generating cross-surface content.
+<!-- GAP-013:END -->

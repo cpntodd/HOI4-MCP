@@ -4,6 +4,9 @@ description: Use when expanding Hearts of Iron IV mod feature ideas into detaile
 ---
 
 # HOI4 Feature Planning
+<!-- GAP-021:COMPLETED -->
+**Depends on:** None (entry point for design)
+**Depended on by:** `hoi4-events` · `hoi4-focus-trees` · `hoi4-decisions-missions` · `hoi4-improvement-loop`
 
 Use this skill to design or expand features for a Hearts of Iron IV mod.
 

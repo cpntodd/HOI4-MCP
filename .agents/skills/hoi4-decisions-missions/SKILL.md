@@ -4,6 +4,9 @@ description: Use when designing, implementing, auditing, or fixing Hearts of Iro
 ---
 
 # HOI4 Decisions and Missions
+<!-- GAP-021:COMPLETED -->
+**Depends on:** `hoi4-events` (decisions fire events) · `hoi4-feature-assets` (decision icons)
+**Depended on by:** `hoi4-focus-trees` · `hoi4-feature-planning`
 
 Use this skill when a task touches decisions, missions, timed objectives, decision categories, mission UI, costs, trigger tooltips, scripted localisation, AI decision behavior, or balance around decision-driven systems.
 

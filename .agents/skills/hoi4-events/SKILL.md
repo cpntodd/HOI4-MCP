@@ -40,6 +40,20 @@ If a task seems to need custom one-off plumbing, first check whether the behavio
 
 
 ## Relationship with other skills
+<!-- GAP-021:COMPLETED — Cross-skill dependency map -->
+
+| Depends On | Why |
+|------------|-----|
+| `hoi4-feature-assets` | Event pictures, report images, icons, DDS assets |
+| `hoi4-text-audio-research` | Sourced quotes, cultural references, audio |
+| `hoi4-mtth` | MTTH variable definitions and patterns |
+
+| Depended On By | Why |
+|----------------|-----|
+| `hoi4-focus-trees` | Focuses fire events as completion rewards |
+| `hoi4-decisions-missions` | Decisions fire events on completion |
+| `hoi4-feature-planning` | Event design needs planning context |
+| `hoi4-improvement-loop` | Event chains are deepened via improvement passes |
 
 Use this skill with:
 
