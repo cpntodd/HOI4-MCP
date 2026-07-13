@@ -345,16 +345,41 @@ class ModIndexer:
                     index.localisation_keys.add(match.group(1))
 
     def _index_scripted_guis(self, index: ModIndex) -> None:
-        """Index scripted GUI files (I-1)."""
+        """Index scripted GUI files — unwraps scripted_gui = { ... } outer container."""
         for filepath in self._scan_txt_files("common/scripted_guis"):
             parsed = parse_file(filepath)
             index.files_indexed += 1
-            for gui_name, gui_data in parsed.data.items():
-                if isinstance(gui_data, dict):
-                    index.scripted_guis[str(gui_name)] = {
-                        "file": str(filepath.relative_to(self.mod_path)),
-                        "context_type": str(gui_data.get("context_type", "")),
-                    }
+
+            # 1. Extract the wrapper, handling both dict (standard) and list (duplicate keys)
+            wrapper = parsed.data.get("scripted_gui")
+            blocks = []
+            if isinstance(wrapper, dict):
+                blocks = [wrapper]
+            elif isinstance(wrapper, list):
+                blocks = [b for b in wrapper if isinstance(b, dict)]
+            else:
+                index.errors.append(
+                    f"{filepath.name}: No valid 'scripted_gui' wrapper found"
+                )
+                continue
+
+            # 2. Iterate through the unwrapped blocks
+            for block in blocks:
+                for gui_name, gui_data in block.items():
+                    if isinstance(gui_data, dict):
+                        # 3. Detect duplicate GUI names across files (mod conflict)
+                        if gui_name in index.scripted_guis:
+                            index.errors.append(
+                                f"{filepath.name}: Duplicate scripted_gui '{gui_name}' — "
+                                f"already defined in {index.scripted_guis[gui_name]['file']}"
+                            )
+
+                        # 4. Index the GUI
+                        index.scripted_guis[str(gui_name)] = {
+                            "file": str(filepath.relative_to(self.mod_path)),
+                            "context_type": str(gui_data.get("context_type", "")),
+                            "window_name": str(gui_data.get("window_name", "")).strip(),
+                        }
 
     def _index_scripted_localisation(self, index: ModIndex) -> None:
         """Index scripted localisation files (I-1)."""
