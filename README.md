@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1B1E22,2C3B4A,3D5060,C9A84C&height=220&section=header&text=HOI4-MCP&fontSize=58&fontColor=F0E6D2&fontAlignY=40&desc=AI-assisted%20HOI4%20modding%20framework&descSize=16&descAlignY=62&descFontColor=D4A574&animation=fadeIn" />
   <br/>
-  <img src="assets/gear-spin.gif" width="80" alt="Spinning iron gear" />
+  <img src="assets/gear-spin.gif" width="96" alt="Spinning iron gear" />
   <br/>
   <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1800&color=C9A84C&center=true&vCenter=true&width=720&lines=%E2%9A%99+Forge+unbreakable+focus+trees;%E2%9C%A7+Script+the+fate+of+nations;%E2%9A%94+Forge+decisions+that+reshape+history;%F0%9F%94%A7+Zero+hallucinations.+Deterministic+results." />
 </div>
