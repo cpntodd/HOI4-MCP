@@ -641,26 +641,29 @@ class VanillaDBBuilder:
                 for key, value in parsed.data.items():
                     if key in ("country_event", "news_event", "state_event", 
                                "unit_event", "decision_event"):
-                        if isinstance(value, dict) and "id" in value:
-                            eid = str(value["id"])
-                            self.conn.execute(
-                                """INSERT OR REPLACE INTO vanilla_events
-                                   (id, namespace, type, title, description,
-                                    is_triggered_only, hide_window, file, raw)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                                (
-                                    eid,
-                                    ns,
-                                    key,
-                                    str(value.get("title", "")),
-                                    str(value.get("desc", "")),
-                                    1 if value.get("is_triggered_only") == "yes" else 0,
-                                    1 if value.get("hide_window") == "yes" else 0,
-                                    str(fp.relative_to(self.vanilla_path)),
-                                    json.dumps(value),
+                        # Handle both single dict and list of dicts (I-4 fix)
+                        events_list = value if isinstance(value, list) else [value]
+                        for event_val in events_list:
+                            if isinstance(event_val, dict) and "id" in event_val:
+                                eid = str(event_val["id"])
+                                self.conn.execute(
+                                    """INSERT OR REPLACE INTO vanilla_events
+                                       (id, namespace, type, title, description,
+                                        is_triggered_only, hide_window, file, raw)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                    (
+                                        eid,
+                                        ns,
+                                        key,
+                                        str(event_val.get("title", "")),
+                                        str(event_val.get("desc", "")),
+                                        1 if event_val.get("is_triggered_only") == "yes" else 0,
+                                        1 if event_val.get("hide_window") == "yes" else 0,
+                                        str(fp.relative_to(self.vanilla_path)),
+                                        json.dumps(event_val),
+                                    )
                                 )
-                            )
-                            count += 1
+                                count += 1
         self.conn.commit()
         return count
 
@@ -696,13 +699,40 @@ class VanillaDBBuilder:
         """Index all vanilla technologies."""
         count = 0
         self.conn.execute("DELETE FROM vanilla_technologies")
-        for fp in self._txt_files("common/technology"):
+        for fp in self._txt_files("common/technologies"):
             parsed = parse_file(fp)
             if "technologies" in parsed.data:
                 techs = parsed.data["technologies"]
                 if isinstance(techs, dict):
                     for tech_key, tech_val in techs.items():
                         if isinstance(tech_val, dict):
+                            # Safely extract fields — parser may produce lists for duplicate keys
+                            def _safe_str(val: Any, default: str = "") -> str:
+                                if isinstance(val, list):
+                                    val = val[0] if val else default
+                                return str(val) if val is not None else default
+                            def _safe_int(val: Any, default: int = 0) -> int:
+                                if isinstance(val, list):
+                                    val = val[0] if val else default
+                                try:
+                                    return int(val)
+                                except (ValueError, TypeError):
+                                    return default
+                            def _safe_float(val: Any, default: float = 0.0) -> float:
+                                if isinstance(val, list):
+                                    val = val[0] if val else default
+                                try:
+                                    return float(val)
+                                except (ValueError, TypeError):
+                                    return default
+                            def _safe_json(val: Any) -> str:
+                                if isinstance(val, list):
+                                    val = val[0] if val else {}
+                                try:
+                                    return json.dumps(val)
+                                except Exception:
+                                    return "{}"
+
                             self.conn.execute(
                                 """INSERT OR REPLACE INTO vanilla_technologies
                                    (id, category, start_year, research_cost,
@@ -710,12 +740,12 @@ class VanillaDBBuilder:
                                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                                 (
                                     str(tech_key),
-                                    str(tech_val.get("category", "")),
-                                    tech_val.get("start_year", 1936),
-                                    tech_val.get("research_cost", 0.0),
-                                    json.dumps(tech_val.get("allow_branch", {})),
+                                    _safe_json(tech_val.get("categories", tech_val.get("folder", {}))),
+                                    _safe_int(tech_val.get("start_year"), 1936),
+                                    _safe_float(tech_val.get("research_cost"), 0.0),
+                                    _safe_json(tech_val.get("prerequisites", {})),
                                     str(fp.relative_to(self.vanilla_path)),
-                                    json.dumps(tech_val),
+                                    _safe_json(tech_val),
                                 )
                             )
                             count += 1

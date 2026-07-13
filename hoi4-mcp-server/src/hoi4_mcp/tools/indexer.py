@@ -59,6 +59,12 @@ class ModIndex:
     # On actions: {on_action_name: {"file": "..."}}
     on_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
 
+    # Scripted GUIs: {gui_name: {"file": "...", "context_type": "..."}}
+    scripted_guis: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    # Scripted localisation: {loc_key: {"file": "..."}}
+    scripted_localisation: dict[str, dict[str, Any]] = field(default_factory=dict)
+
     # Localisation keys found: set of all keys
     localisation_keys: set[str] = field(default_factory=set)
 
@@ -86,9 +92,11 @@ class ModIndexer:
         "decisions": "common/decisions",
         "ideas": "common/ideas",
         "characters": "common/characters",
-        "technologies": "common/technology",
+        "technologies": "common/technologies",
         "scripted_effects": "common/scripted_effects",
         "scripted_triggers": "common/scripted_triggers",
+        "scripted_guis": "common/scripted_guis",
+        "scripted_localisation": "common/scripted_localisation",
         "on_actions": "common/on_actions",
         "localisation": "localisation/english",
         "country_history": "history/countries",
@@ -153,15 +161,18 @@ class ModIndexer:
             for key, value in parsed.data.items():
                 if key in ("country_event", "news_event", "unit_event", 
                            "state_event", "decision_event"):
-                    if isinstance(value, dict) and "id" in value:
-                        eid = str(value["id"])
-                        index.events[eid] = {
-                            "file": str(filepath.relative_to(self.mod_path)),
-                            "type": key,
-                            "title": str(value.get("title", "")),
-                            "is_triggered_only": value.get("is_triggered_only", "no") == "yes",
-                            "hide_window": value.get("hide_window", "no") == "yes",
-                        }
+                    # Handle both single dict and list of dicts (I-4 fix)
+                    events_list = value if isinstance(value, list) else [value]
+                    for event_val in events_list:
+                        if isinstance(event_val, dict) and "id" in event_val:
+                            eid = str(event_val["id"])
+                            index.events[eid] = {
+                                "file": str(filepath.relative_to(self.mod_path)),
+                                "type": key,
+                                "title": str(event_val.get("title", "")),
+                                "is_triggered_only": event_val.get("is_triggered_only", "no") == "yes",
+                                "hide_window": event_val.get("hide_window", "no") == "yes",
+                            }
                 elif key == "add_namespace":
                     pass  # Already handled
 
@@ -311,19 +322,49 @@ class ModIndexer:
                         }
 
     def _index_localisation(self, index: ModIndex) -> None:
-        """Extract all localisation keys from YML files."""
+        """Extract all localisation keys from YML files (I-2: recursive scan)."""
         import re
-        loc_pattern = re.compile(r'^\s+([A-Za-z0-9_.-]+):(\d+)\s+"')
+        # Match "KEY:0 \"value\"" (standard), "KEY: \"value\"" (Kaiserreich no-version),
+        # and " KEY: \"value\"" (leading whitespace variants)
+        loc_pattern = re.compile(r'^\s*([A-Za-z0-9_.-]+):(?:\d+)?\s*"')
 
-        for filepath in self._scan_yml_files("localisation/english"):
+        loc_root = self.mod_path / "localisation"
+        if not loc_root.exists():
+            return
+
+        # Recursively scan all .yml files under localisation/ (all languages)
+        for filepath in sorted(loc_root.rglob("*.yml")):
             try:
                 text = filepath.read_text(encoding="utf-8")
             except Exception:
                 continue
+            index.files_indexed += 1
             for line in text.split("\n"):
                 match = loc_pattern.match(line)
                 if match:
                     index.localisation_keys.add(match.group(1))
+
+    def _index_scripted_guis(self, index: ModIndex) -> None:
+        """Index scripted GUI files (I-1)."""
+        for filepath in self._scan_txt_files("common/scripted_guis"):
+            parsed = parse_file(filepath)
+            index.files_indexed += 1
+            for gui_name, gui_data in parsed.data.items():
+                if isinstance(gui_data, dict):
+                    index.scripted_guis[str(gui_name)] = {
+                        "file": str(filepath.relative_to(self.mod_path)),
+                        "context_type": str(gui_data.get("context_type", "")),
+                    }
+
+    def _index_scripted_localisation(self, index: ModIndex) -> None:
+        """Index scripted localisation files (I-1)."""
+        for filepath in self._scan_txt_files("common/scripted_localisation"):
+            parsed = parse_file(filepath)
+            index.files_indexed += 1
+            for loc_key, loc_data in parsed.data.items():
+                index.scripted_localisation[str(loc_key)] = {
+                    "file": str(filepath.relative_to(self.mod_path)),
+                }
 
     def build_index(self) -> ModIndex:
         """Build a complete index of the mod."""
@@ -341,6 +382,8 @@ class ModIndexer:
             self._index_scripted_files,
             self._index_on_actions,
             self._index_localisation,
+            self._index_scripted_guis,
+            self._index_scripted_localisation,
         ]
 
         for indexer in indexers:
@@ -369,6 +412,8 @@ class ModIndexer:
             "technologies": index.technologies,
             "scripted_effects": index.scripted_effects,
             "scripted_triggers": index.scripted_triggers,
+            "scripted_guis": index.scripted_guis,
+            "scripted_localisation": index.scripted_localisation,
             "on_actions": index.on_actions,
             "localisation_keys": sorted(index.localisation_keys),
             "localisation_key_count": len(index.localisation_keys),
