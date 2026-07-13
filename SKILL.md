@@ -656,6 +656,470 @@ Defined in `common/technology_tags/`:
 
 ---
 
+## Balance of Power
+<!-- GAP-015:COMPLETED — BOP section from 1.19.x scan (FIN, ITA, SWE, SWI, PRC patterns) -->
+
+### File Location
+`common/bop/<name>.txt`
+
+Introduced in By Blood Alone (1.12). Represents a political/mechanical slider between -1.0 and +1.0 with ranges that apply modifiers and fire effects when entered/exited.
+
+### Structure
+```
+<bop_id> = {
+    initial_value = <float>  # -1.0 to 1.0
+    left_side = <left_side_id>
+    right_side = <right_side_id>
+    decision_category = <category_id>  # optional — links BOP UI to decision tab
+
+    # Neutral/middle range (between sides)
+    range = {
+        id = <range_id>
+        min = <float>
+        max = <float>
+        modifier = { <static_modifiers> }
+        on_activate = { <effects> }
+        on_deactivate = { <effects> }
+    }
+
+    # Left side (negative values toward -1)
+    side = {
+        id = <side_id>
+        icon = <GFX_key>
+        range = { id = <id> min = <float> max = <float>
+            modifier = { ... }
+            on_activate = { ... }
+            on_deactivate = { ... }
+        }
+        # ... additional ranges
+    }
+
+    # Right side (positive values toward +1)
+    side = {
+        id = <side_id>
+        icon = <GFX_key>
+        range = { ... }
+    }
+}
+```
+
+### Key Rules
+- **`initial_value`**: Determines which range is active at game start. Must fall within one of the defined ranges.
+- **Ranges tile the spectrum**: All ranges from all sides + top-level must cover `[-1.0, 1.0]` with no gaps or overlaps.
+- **`modifier = { }` inside a range**: Applies static country modifiers while the BOP value is in that range. Always active when in-range — no conditions needed.
+- **`on_activate` / `on_deactivate`**: Fire effects when entering/leaving a range. Common uses:
+  - `swap_ideas { remove_idea = X add_idea = Y }` — swap national spirits as the BOP shifts
+  - `set_power_balance_gfx { id = <bop_id> side = <side_id> gfx = <gfx_key> }` — change side icon
+  - `promote_character` — install leaders when a faction gains influence
+  - `country_event = <id>` — fire events for major state changes
+  - `start_civil_war` — civil war at extreme values
+- **Multiple sides**: A BOP can have more than 2 sides (e.g., ITA has 5 factions). Each `side` block is independently defined.
+- **Multi-faction on same side**: Two `side` blocks can occupy the same spectrum position but with different `icon` values — used for internal faction competition within the same political wing.
+
+### Common Pitfalls
+- **Gaps in range coverage**: If no range covers a value between -1 and +1, the BOP breaks.
+- **Overlapping ranges**: Two ranges covering the same value produce undefined behavior.
+- **No GFX fallback**: If `set_power_balance_gfx` isn't used, the BOP UI shows default icons.
+- **DLC dependency**: BOP itself doesn't use `has_dlc` — but the focuses and decisions that SHIFT the BOP do. Always check DLC requirements on the sources that feed the BOP.
+
+---
+
+## Military Industrial Organizations (MIOs)
+<!-- GAP-015:COMPLETED — MIO section from 1.19.x scan (55+ country org files) -->
+
+### File Location
+`common/military_industrial_organization/organizations/<name>.txt`
+
+Introduced in Arms Against Tyranny (1.13). Represents military design bureaus/manufacturers that gain traits and upgrade equipment production lines.
+
+### Structure
+```
+<mio_token> = {
+    icon = <GFX_key>
+    background = <GFX_key>  # optional detail panel background
+
+    allowed = {
+        original_tag = <TAG>  # country that gets this MIO
+        has_dlc = "<dlc>"     # optional DLC gate
+    }
+
+    # Trait slot categories
+    trait_general = { <trait1> <trait2> }
+    trait_land = { <trait1> <trait2> }
+    trait_air = { <trait1> <trait2> }
+    trait_naval = { <trait1> <trait2> }
+
+    # Initial funds and gain rate
+    initial_funds = <int>
+    funds_gain_factor = <float>  # multiplier on fund gain rate
+
+    # Equipment types this MIO can design
+    equipment_types = {
+        <equipment_archetype>
+    }
+
+    # Design team assignment
+    design_team = {
+        allowed_types = { <types> }
+    }
+}
+```
+
+### Policies
+Defined in `common/military_industrial_organization/policies/`:
+```
+<policy_id> = {
+    icon = <GFX_key>
+    modifier = { <static_modifiers> }
+    allowed = { <triggers> }
+    cost = <int>  # funds cost
+}
+```
+
+### Key Rules
+- **MIOs upgrade equipment**: An MIO assigned to a production line applies its traits as bonuses to produced equipment.
+- **`include`**: An MIO can inherit traits from a parent via `include = <parent_token>`.
+- **Equipment type filtering**: Each MIO specifies which equipment archetypes it affects (e.g., `infantry_equipment`, `light_tank_chassis`).
+- **Funds**: MIOs have a funds pool; policies cost funds to activate. `funds_gain_factor` controls rate.
+- **Traits**: Come in tiers. Higher tiers unlock as the MIO gains experience from producing equipment.
+
+### Common Pitfalls
+- **No `allowed` block**: MIO appears for all countries — usually unintended.
+- **Missing equipment types**: MIO exists but can't be assigned to any production line.
+- **Wrong trait slots**: Land traits in `trait_air` have no effect.
+
+---
+
+## Scripted GUIs
+<!-- GAP-015:COMPLETED — Scripted GUI section from 1.19.x scan -->
+
+### File Location
+`common/scripted_guis/<name>.txt`
+
+Scripted GUIs create custom UI panels with dynamic content driven by Clausewitz script. Used for BOP displays, faction management, custom decision interfaces, and complex mechanic UIs.
+
+### Structure
+```
+<scripted_gui_name> = {
+    container = {
+        name = <container_name>
+        position = { x = <int> y = <int> }
+        width = <int>
+        height = <int>
+        orientation = upper_left  # or lower_left, upper_right, lower_right
+        movable = yes/no
+        clipping = yes/no
+        margin = { x = <int> y = <int> }
+        background = { <GFX_sprite> }
+        visible = { <triggers> }
+        # Child elements go inside containers
+        iconType = { name = <name> position = { x y } spriteType = <gfx> frame = <int> }
+        instantTextboxType = { name = <name> position = ... text = <loc> font = <font> format = left }
+        buttonType = { name = <name> position = ... spriteType = <gfx> }
+    }
+}
+```
+
+### Element Types
+| Element | Purpose |
+|---------|---------|
+| `container` | Nestable container with position, size, clipping |
+| `iconType` | Static or animated icon referencing a `spriteType` GFX entry |
+| `instantTextboxType` | Text display with font, alignment, max dimensions |
+| `buttonType` | Clickable button with animation states |
+| `gridboxType` | Grid-laid container with auto-sized slots |
+| `listboxType` | Scrollable list container |
+| `windowType` | Draggable, closeable window |
+| `scrollareaType` | Scrollable content area |
+
+### Key Rules
+- **Positioning**: All positions are relative to parent container. `x=0, y=0` is top-left of parent.
+- **Orientation**: Controls anchor point — `upper_left` anchors to parent's top-left.
+- **Conditional visibility**: Each element can have `visible = { <triggers> }` using country-scope conditions.
+- **GFX references**: All sprite/icon references must exist in `gfx/` directory with registered `spriteType` definitions.
+- **Scripted GUI entry**: Registered in `interface/` files; each GUI needs an `on_open` handler.
+
+### Common Pitfalls
+- **Missing GFX reference**: `spriteType` pointing to a non-existent sprite = blank element or CTD.
+- **Clipping without size**: `clipping = yes` without `width`/`height` clips to 0.
+- **Text overflow**: `instantTextboxType` without `maxWidth`/`maxHeight` can overflow container.
+- **Nested positioning confusion**: Deeply nested containers with `orientation` changes produce unexpected absolute positions.
+
+---
+
+## Raids
+<!-- GAP-015:COMPLETED — Raids section from 1.19.x scan -->
+
+### File Location
+`common/raids/<type>_raids.txt`
+
+Introduced in Götterdämmerung (1.15). Special operations that target provinces/buildings — air strikes, naval commandos, paratrooper sabotage, nuclear strikes, land infiltration.
+
+### Structure
+```
+# Categories define behavior FOR a raid type
+categories = {
+    <category_id> = {
+        intel_source = air  # air | naval | army | civilian
+        visible = { <triggers> }
+        available = { <triggers> }
+        free_targeting = yes  # nukes can target any province
+        faction_influence_score_on_success = <int>
+    }
+}
+
+# Raid types define WHAT the raid does
+types = {
+    <raid_id> = {
+        category = <category_id>
+        command_power = <int>
+        days_to_prepare = <int>
+        days_re_enable = <int>
+        fire_only_once = yes/no
+        max_distance = <int>
+        speed_multiplier = <float>
+
+        allowed = { <triggers> }
+        visible = { <triggers> }
+        available = { <triggers> }
+        launchable = { <triggers> }
+        cancel_trigger = { <triggers> }
+
+        target_type = {
+            province = any  # or id = <int>, or { id1 id2 }
+            building = { type = <type> level = { min = X max = Y } is_coastal = yes }
+        }
+
+        starting_point = {
+            types = { air_base naval_base rocket_site }
+            allow_faction_buildings = yes
+        }
+
+        # Equipment/special forces required
+        unit_requirements = {
+            battalion_types = { mountaineers = { min = 2 } }
+            equipment = {
+                type = { tactical_bomber }
+                amount = { min = 80 max = 100 }
+            }
+        }
+
+        # What happens on success/failure
+        on_success = { <effects> }
+        on_failure = { <effects> }
+        on_cancel = { <effects> }
+
+        arrow = { type = air }  # air | naval | land | ballistic | line
+    }
+}
+```
+
+### Key Rules
+- **Raid lifecycle**: `available` (can prep?) → `launchable` (can start?) → executes → `on_success`/`on_failure`.
+- **Target scoping**: `target_type` determines what the player can click. `building` targets can filter by level and coastal status.
+- **Starting points**: Raids launch from owned/controlled/faction buildings of the specified types.
+- **Cooldowns**: `days_re_enable` prevents spamming the same raid type.
+- **Entity rendering**: `unit_model` + `unit_animations` control the 3D unit that flies/sails/drives across the map during the raid.
+
+### Common Pitfalls
+- **No starting point in range**: Raid can't launch if no qualifying building is within `max_distance`.
+- **Equipment mismatch**: `unit_requirements` with wrong equipment type = raid greyed out with no explanation.
+- **Missing `visible`**: Raid type hidden from UI entirely — hard to debug.
+
+---
+
+## Equipment Modding
+<!-- GAP-015:COMPLETED — Equipment section from 1.19.x scan -->
+
+### File Location
+`common/units/equipment/<type>.txt`
+
+Defines equipment archetypes — tanks, planes, ships, infantry kits. Each archetype has module slots that accept specific module types.
+
+### Structure
+```
+equipment = {
+    <archetype_key> = {
+        # Base stats
+        type = { infantry }  # infantry | tank | ship | plane
+        group = <group_key>  # e.g., infantry_equipment
+        is_buildable = yes
+        is_base = yes/no     # is this the base variant?
+        active = yes
+
+        # Module slots
+        modules = {
+            <slot_name> = {
+                category = <module_category>
+                archetype = <archetype_key>  # what this slot accepts
+                required = yes/no
+                default = <module_key>         # default module if none assigned
+            }
+        }
+
+        # Resources
+        resources = {
+            steel = <int>
+            chromium = <int>
+            oil = <int>
+        }
+
+        # Stats
+        build_cost_ic = <float>
+        reliability = <float>
+        maximum_speed = <float>
+        defense = <float>
+        breakthrough = <float>
+        hardness = <float>
+        armor_value = <float>
+        fuel_consumption = <float>
+
+        # Set at game start
+        start_year = <int>
+
+        # Optional
+        can_convert_from = <archetype_key>
+        priority = <int>         # AI production priority
+        interface_category = <category>
+        picture = <GFX_key>
+    }
+}
+```
+
+### Key Rules
+- **`is_base = yes`**: Base variants are always available. Upgraded variants (via MIOs/tech) have `is_base = no`.
+- **Module slot archetypes**: Each slot consumes a specific module archetype. Check equipment type documentation for valid combinations.
+- **`active = yes`**: Inactive equipment won't appear in production UI.
+- **Resources**: Per-factory resource cost. Scaled by production efficiency.
+- **`can_convert_from`**: Enables production line conversion from older equipment types.
+
+### Common Pitfalls
+- **Missing `default` module**: Required module slot without a default = equipment can't be produced until a module is assigned.
+- **Wrong `group`**: Equipment doesn't appear in production tab if group is mismatched.
+- **`start_year` too late**: Equipment never available in scenarios starting before its year.
+
+---
+
+## AI Strategies
+<!-- GAP-015:COMPLETED — AI Strategies section -->
+
+### File Location
+`common/ai_strategy/<name>.txt` and `common/ai_strategy_plans/<name>.txt`
+
+Controls AI country behavior: which focuses to prioritize, who to ally with, what to produce, when to declare war.
+
+### AI Strategy Structure
+```
+<strategy_name> = {
+    allowed = { <triggers> }
+    enable = {
+        # Effects to enable when strategy activates
+        tag = <TAG>
+        set_strategy = <plan_name>
+    }
+    abort = { <triggers> }
+    ai_strategy = {
+        type = <strategy_type>
+        id = <target_id>
+        value = <int>
+    }
+}
+```
+
+### AI Strategy Plan Structure
+```
+<plan_name> = {
+    allowed = { <triggers> }
+    enable = { <effects> }
+    abort = { <triggers> }
+
+    # Focus selection
+    focus = <focus_id>
+
+    # Diplomatic actions
+    diplomatic = {
+        type = alliance
+        id = <TAG>
+        value = <int>
+    }
+
+    # Production
+    production = {
+        equipment = <archetype_id>
+        value = <int>
+    }
+}
+```
+
+### Key Rules
+- **`type`/`id`/`value` pattern**: The `value` is an integer weight — higher = stronger preference. Negative values = avoidance.
+- **`abort` triggers**: When true, the strategy deactivates. Used for one-time historical behaviors (e.g., Germany stops focusing on Anschluss after it fires).
+- **Strategy plans can chain**: One plan can `set_strategy` to another plan.
+
+### Common Pitfalls
+- **No `abort` condition**: Strategy never deactivates, AI gets stuck.
+- **`allowed` too broad**: Strategy activates for wrong countries.
+- **Missing `value`**: Default 0 means no preference — AI ignores the strategy.
+
+---
+
+## Ideology Modding
+<!-- GAP-015:COMPLETED — Ideology section from 1.19.x scan -->
+
+### File Location
+`common/ideologies/00_ideologies.txt`
+
+Defines the 4 base ideologies, their sub-types, diplomatic rules, and AI behaviors.
+
+### Structure
+```
+ideologies = {
+    <ideology_name> = {
+        types = {
+            <sub_type> = { }  # can have can_be_randomly_selected = no
+        }
+        dynamic_faction_names = { "<LOC_KEY_1>" "<LOC_KEY_2>" }
+        color = { <R_int> <G_int> <B_int> }
+
+        rules = {
+            can_create_collaboration_government = yes/no
+            can_declare_war_on_same_ideology = yes/no
+            can_force_government = yes/no
+            can_send_volunteers = yes/no
+            can_puppet = yes/no
+            can_lower_tension = yes/no
+            can_only_justify_war_on_threat_country = yes/no
+            can_guarantee_other_ideologies = yes/no
+        }
+
+        modifiers = {
+            <modifier> = <value>
+        }
+        faction_modifiers = {
+            trade_opinion_factor = <float>
+        }
+
+        ai_<ideology_name> = yes
+        ai_ideology_wanted_units_factor = <float>
+    }
+}
+```
+
+### Key Rules
+- **4 base ideologies only**: `democratic`, `communism`, `fascism`, `neutrality`. Cannot add a 5th — the engine only recognizes these four.
+- **Sub-types**: Purely cosmetic/label — sub-ideologies don't change mechanics. `can_be_randomly_selected = no` prevents random country leaders from getting niche sub-types.
+- **`rules` block**: Controls diplomatic capabilities per ideology. Democratic is the most restricted (`can_declare_war_on_same_ideology = no`, `can_lower_tension = yes`).
+- **Colors**: Used on the political map mode and ideology pie charts. Keep RGB values in 0–255 range.
+- **`modifiers` block**: Applies to ALL countries of that ideology. Use for global ideology-specific mechanics.
+- **`ai_<name> = yes`**: Binds this ideology to the `<name>` AI personality profile defined in `common/ai_personalities/`.
+
+### Common Pitfalls
+- **Adding a 5th ideology**: Not supported. Use sub-types within the 4 base ideologies instead.
+- **Sub-type without `can_be_randomly_selected = no`**: Random country leader gets a niche sub-type (e.g., Buddhist Socialism on Randomistan).
+- **Color outside 0–255**: Wraps around — produces unexpected colors.
+
+---
+
 ## Vanilla Modifier Reference
 
 Commonly used vanilla modifiers for national spirits, ideas, leader traits, and focus rewards.
