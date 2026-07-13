@@ -228,6 +228,12 @@ HOI4-MCP/
 
 ---
 
+### Acknowledgments
+
+This project is built upon the foundational work of **[Agentic-HOI4-Modding](https://github.com/klimPaskov/Agentic-HOI4-Modding)** by [klimPaskov](https://github.com/klimPaskov), which pioneered the concept of using AI agents with MCP servers for Hearts of Iron IV modding. The original project established the core patterns for deterministic mod data access, vanilla game lookups, and agent-assisted mod development that this project extends with syntax validation, adaptive learning, and expanded tool coverage.
+
+---
+
 <div align="center">
 
 ### Links

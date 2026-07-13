@@ -158,3 +158,9 @@ This MCP server is designed to work alongside the HOI4 modding agent prompt and 
 The `.agent.md` file tells the AI **how** to think about HOI4 modding.  
 The `SKILL.md` file tells the AI **what** syntax to use.  
 The **MCP server** gives the AI **deterministic data** about the specific mod and game.
+
+---
+
+## Credits
+
+This MCP server is based on the foundational work of **[Agentic-HOI4-Modding](https://github.com/klimPaskov/Agentic-HOI4-Modding)** by [klimPaskov](https://github.com/klimPaskov), which pioneered the concept of using MCP servers to give AI agents deterministic, structured access to Hearts of Iron IV mod data and vanilla game files.

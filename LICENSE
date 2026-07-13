@@ -3,6 +3,10 @@ Version 3, 29 June 2007
 
 Copyright (C) 2026 cpntodd
 
+This project is based on Agentic-HOI4-Modding (https://github.com/klimPaskov/Agentic-HOI4-Modding)
+by klimPaskov, which provided the foundational MCP server architecture and agent patterns for
+AI-assisted Hearts of Iron IV modding.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or

@@ -4,6 +4,8 @@
 
 Repository-wide rules for all AI agents (Codex, DeepSeek, Claude, Z.AI, or any MCP-capable assistant) working on this project.
 
+> **Based on:** [Agentic-HOI4-Modding](https://github.com/klimPaskov/Agentic-HOI4-Modding) by [klimPaskov](https://github.com/klimPaskov) — the original project that established AI-agent-assisted HOI4 modding with MCP servers.
+
 ## File Structure Conventions
 
 - **Mod content files** (`.txt` Clausewitz, `.yml` localisation): Follow Paradox Interactive naming — lowercase with underscores, no spaces.

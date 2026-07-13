@@ -1,6 +1,8 @@
 # HOI4-MCP — Setup Guide
 
 > Everything you need to get the HOI4-MCP server running with your AI coding assistant.
+>
+> **Based on:** [Agentic-HOI4-Modding](https://github.com/klimPaskov/Agentic-HOI4-Modding) by [klimPaskov](https://github.com/klimPaskov) — the original project that pioneered AI-agent-assisted HOI4 modding with MCP servers.
 
 ---
 
