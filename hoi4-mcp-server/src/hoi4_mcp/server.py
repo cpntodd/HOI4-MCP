@@ -63,8 +63,8 @@ class ServerConfig:
         mod_path: str | None = None,
         vanilla_path: str | None = None,
         vanilla_db_path: str | None = None,
+        auto_detect_mod: bool = False,
     ):
-        self.mod_path = Path(mod_path) if mod_path else None
         self.vanilla_path = Path(vanilla_path) if vanilla_path else None
         self.vanilla_db_path = (
             Path(vanilla_db_path)
@@ -72,9 +72,44 @@ class ServerConfig:
             else Path.home() / ".hoi4_mcp" / "vanilla.db"
         )
 
+        # Auto-detect mod from workspace if requested and no explicit path
+        if auto_detect_mod and not mod_path:
+            detected = self._auto_detect_mod()
+            if detected:
+                mod_path = str(detected)
+
+        self.mod_path = Path(mod_path) if mod_path else None
+
         # Validate
         if self.mod_path and not self.mod_path.exists():
             raise FileNotFoundError(f"Mod path not found: {self.mod_path}")
+
+    @staticmethod
+    def _auto_detect_mod() -> Path | None:
+        """Scan CWD and parent directories for a HOI4 mod descriptor file."""
+        cwd = Path.cwd()
+        # Check CWD and up to 3 parent levels
+        for directory in [cwd] + list(cwd.parents)[:3]:
+            # Check for descriptor.mod or *.mod files
+            descriptor = directory / "descriptor.mod"
+            if descriptor.exists():
+                return directory
+            # Check for .mod files (Steam Workshop style)
+            mod_files = list(directory.glob("*.mod"))
+            if mod_files:
+                return directory
+        return None
+
+    def set_mod_path(self, path: str | Path | None) -> bool:
+        """Update the active mod path at runtime. Returns True if successful."""
+        if path is None:
+            self.mod_path = None
+            return True
+        p = Path(path)
+        if not p.exists():
+            return False
+        self.mod_path = p
+        return True
 
     @property
     def has_mod(self) -> bool:
@@ -94,15 +129,29 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
     
     server = FastMCP("hoi4-modding-server")
 
+    # Mutable state so set_mod_path can dynamically switch mods (GAP-004)
+    _state: dict[str, Any] = {
+        "mod_path": config.mod_path,
+    }
+
+    def _has_mod() -> bool:
+        return _state["mod_path"] is not None and _state["mod_path"].exists()
+
     # Lazy-initialized tools
     _mod_index_cache: dict[str, Any] | None = None
     _vanilla_lookup: VanillaLookup | None = None
     _id_manager: IDManager | None = None
 
+    def _invalidate_mod_caches() -> None:
+        """Invalidate all mod-dependent caches when mod path changes."""
+        nonlocal _mod_index_cache, _id_manager
+        _mod_index_cache = None
+        _id_manager = None
+
     def _get_mod_index() -> dict[str, Any]:
         nonlocal _mod_index_cache
-        if _mod_index_cache is None and config.has_mod:
-            indexer = ModIndexer(config.mod_path)
+        if _mod_index_cache is None and _has_mod():
+            indexer = ModIndexer(_state["mod_path"])
             _mod_index_cache = json.loads(indexer.build_index_json())
         return _mod_index_cache or {}
 
@@ -114,8 +163,8 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
 
     def _get_id_manager() -> IDManager:
         nonlocal _id_manager
-        if _id_manager is None and config.has_mod:
-            _id_manager = IDManager(config.mod_path)
+        if _id_manager is None and _has_mod():
+            _id_manager = IDManager(_state["mod_path"])
         return _id_manager
 
     # Lazy-initialized learning system (GAP-000)
@@ -155,15 +204,15 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
         """
         nonlocal _mod_index_cache
 
-        if not config.has_mod:
+        if not _has_mod():
             return [TextContent(
                 type="text",
-                text="Error: No mod path configured. Launch the MCP server with --mod-path /path/to/your/mod"
+                text="Error: No mod path configured. Launch with --mod-path, set HOI4_MOD_PATH env var, or use set_mod_path tool."
             )]
 
         # Invalidate cache if requested
         if refresh:
-            _mod_index_cache = None
+            _invalidate_mod_caches()
 
         index = _get_mod_index()
 
@@ -235,7 +284,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             namespace: For events — the namespace (e.g., 'mymod'). Required for event type.
             prefix: For focuses — an optional prefix to filter (e.g., 'mymod_').
         """
-        if not config.has_mod:
+        if not _has_mod():
             return [TextContent(
                 type="text",
                 text="Error: No mod path configured."
@@ -312,7 +361,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             id_value: The exact ID string to check (e.g., 'mymod.1', 'my_focus_name').
             id_type: Scope to search — 'event', 'focus', 'decision', 'idea', 'character', or 'any'.
         """
-        if not config.has_mod:
+        if not _has_mod():
             return [TextContent(
                 type="text",
                 text="Error: No mod path configured."
@@ -352,7 +401,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             file_pattern: File glob pattern (default: '*.txt'). Use '*.yml' for localisation.
             max_results: Maximum results to return (default: 30).
         """
-        if not config.has_mod:
+        if not _has_mod():
             return [TextContent(
                 type="text",
                 text="Error: No mod path configured."
@@ -365,7 +414,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
 
         import fnmatch
 
-        search_root = config.mod_path / subdir if subdir else config.mod_path
+        search_root = _state["mod_path"] / subdir if subdir else _state["mod_path"]
         if not search_root.exists():
             return [TextContent(
                 type="text",
@@ -393,7 +442,7 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
                         if len(matching_lines) >= 5:
                             break
 
-                rel_path = str(filepath.relative_to(config.mod_path))
+                rel_path = str(filepath.relative_to(_state["mod_path"]))
                 results.append({
                     "file": rel_path,
                     "match_count": sum(1 for l in lines if query_lower in l.lower()),
@@ -644,8 +693,8 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
         """
         if definition_csv_path:
             csv_path = Path(definition_csv_path)
-        elif config.has_mod:
-            csv_path = config.mod_path / "map" / "definition.csv"
+        elif _has_mod():
+            csv_path = _state["mod_path"] / "map" / "definition.csv"
         else:
             return [TextContent(
                 type="text",
@@ -966,12 +1015,112 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             )]
 
     # -----------------------------------------------------------------------
+    # Tool: set_mod_path (GAP-004 — dynamic workspace switching)
+    # -----------------------------------------------------------------------
+    @server.tool()
+    async def set_mod_path(
+        mod_path: str = "",
+        auto_detect: bool = False,
+    ) -> list[TextContent]:
+        """Switch the active mod at runtime without restarting the server.
+
+        Use this when opening a different HOI4 mod workspace. The server
+        invalidates all mod caches and re-indexes the new mod on next access.
+
+        Args:
+            mod_path: Absolute path to the new mod directory. If empty and
+                      auto_detect=True, scans CWD/parents for descriptor.mod.
+            auto_detect: If true, auto-detect a mod from the current working
+                         directory and parent directories.
+        """
+        if auto_detect:
+            detected = ServerConfig._auto_detect_mod()
+            if detected:
+                mod_path = str(detected)
+            else:
+                return [TextContent(
+                    type="text",
+                    text=json.dumps({
+                        "success": False,
+                        "error_code": "NO_MOD_DETECTED",
+                        "message": "No HOI4 mod found in CWD or parent directories.",
+                        "help": "Provide an explicit mod_path or ensure the workspace contains a descriptor.mod file.",
+                    }, ensure_ascii=False),
+                )]
+
+        if not mod_path.strip():
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error_code": "MISSING_PATH",
+                    "message": "Provide mod_path or set auto_detect=true.",
+                }, ensure_ascii=False),
+            )]
+
+        p = Path(mod_path.strip())
+        if not p.exists():
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error_code": "PATH_NOT_FOUND",
+                    "message": f"Mod path does not exist: {p}",
+                }, ensure_ascii=False),
+            )]
+
+        # Check it looks like a mod directory
+        if not (p / "descriptor.mod").exists() and not list(p.glob("*.mod")):
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error_code": "NOT_A_MOD",
+                    "message": f"Directory does not appear to be a HOI4 mod (no descriptor.mod or .mod file found): {p}",
+                }, ensure_ascii=False),
+            )]
+
+        # Switch
+        old_path = str(_state["mod_path"]) if _state["mod_path"] else "none"
+        _state["mod_path"] = p
+        _invalidate_mod_caches()
+
+        # Verify the index builds
+        try:
+            index = _get_mod_index()
+            mod_name = index.get("mod_name", p.name)
+            event_count = len(index.get("events", {}))
+            focus_count = len(index.get("focuses", {}))
+        except Exception as e:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error_code": "INDEX_FAILED",
+                    "message": f"Mod path set but index failed: {e}",
+                }, ensure_ascii=False),
+            )]
+
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": True,
+                "previous": old_path,
+                "current": str(p),
+                "mod_name": mod_name,
+                "events": event_count,
+                "focuses": focus_count,
+                "message": f"Switched to mod: {mod_name} ({event_count} events, {focus_count} focuses). All caches invalidated.",
+            }, ensure_ascii=False),
+        )]
+
+    # -----------------------------------------------------------------------
     # Resources
     # -----------------------------------------------------------------------
     @server.resource("mod://descriptor")
     async def get_mod_descriptor() -> str:
         """Returns the mod descriptor data (name, version, dependencies, etc.)."""
-        if not config.has_mod:
+        if not _has_mod():
             return json.dumps({"error": "No mod path configured"})
         index = _get_mod_index()
         return json.dumps(index.get("descriptor", {}), indent=2)
@@ -1030,6 +1179,11 @@ def main() -> None:
         help="Build the vanilla database on startup if needed.",
     )
     parser.add_argument(
+        "--auto-detect-mod",
+        action="store_true",
+        help="Auto-detect the mod path from the current working directory (looks for descriptor.mod).",
+    )
+    parser.add_argument(
         "--report",
         help="Generate a self-contained HTML mod report and exit.",
         default=None,
@@ -1065,11 +1219,12 @@ def main() -> None:
         mod_path=args.mod_path,
         vanilla_path=args.vanilla_path,
         vanilla_db_path=args.vanilla_db,
+        auto_detect_mod=args.auto_detect_mod,
     )
 
     if not config.has_mod:
-        print("Warning: No --mod-path provided. Mod-specific tools will be unavailable.")
-        print("Set HOI4_MOD_PATH environment variable or pass --mod-path.")
+        print("Warning: No --mod-path provided and no mod auto-detected. Mod-specific tools will be unavailable.")
+        print("Set HOI4_MOD_PATH environment variable, pass --mod-path, or use --auto-detect-mod.")
 
     run_server(config)
 
