@@ -1,7 +1,9 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1C2A35,2E4A62,3F6B8C,5C8FB8&height=220&section=header&text=HOI4-MCP&fontSize=58&fontColor=EAF2FF&fontAlignY=40&desc=AI-assisted%20HOI4%20modding%20framework&descSize=16&descAlignY=62&descFontColor=C9D9EC&animation=fadeIn" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1B1E22,2C3B4A,3D5060,C9A84C&height=220&section=header&text=HOI4-MCP&fontSize=58&fontColor=F0E6D2&fontAlignY=40&desc=AI-assisted%20HOI4%20modding%20framework&descSize=16&descAlignY=62&descFontColor=D4A574&animation=fadeIn" />
   <br/>
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1800&color=8FBCE6&center=true&vCenter=true&width=720&lines=Deterministic+mod+data+for+AI+agents;Zero+hallucination+vanilla+lookups;Syntax+validation+before+game+launch;Learns+from+every+mistake" />
+  <img src="assets/gear-spin.gif" width="80" alt="Spinning iron gear" />
+  <br/>
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1800&color=C9A84C&center=true&vCenter=true&width=720&lines=%E2%9A%99+Forge+unbreakable+focus+trees;%E2%9C%A7+Script+the+fate+of+nations;%E2%9A%94+Forge+decisions+that+reshape+history;%F0%9F%94%A7+Zero+hallucinations.+Deterministic+results." />
 </div>
 
 ---
@@ -12,12 +14,17 @@
 
 Turns any AI coding assistant into a Hearts of Iron IV modding expert — deterministic data, zero hallucinations, compounding knowledge.
 
-<img src="https://img.shields.io/badge/python-3.10+-blue?style=flat-square&logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" />
-<img src="https://img.shields.io/badge/MCP-1.0+-purple?style=flat-square" />
-<img src="https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey?style=flat-square" />
-<img src="https://img.shields.io/badge/tests-101%20passed-brightgreen?style=flat-square" />
-<img src="https://img.shields.io/badge/vanilla%20DB-40K%20events%20%7C%205.6K%20focuses-blue?style=flat-square" />
+<img src="https://img.shields.io/badge/Clausewitz-Engine-1B1E22?style=flat-square&logoColor=C9A84C" />
+<img src="https://img.shields.io/badge/Focus-Trees-C9A84C?style=flat-square&logoColor=1B1E22" />
+<img src="https://img.shields.io/badge/Events_&_Decisions-3D5060?style=flat-square&logoColor=F0E6D2" />
+<img src="https://img.shields.io/badge/Map-Modding-2C3B4A?style=flat-square&logoColor=D4A574" />
+<br/>
+<img src="https://img.shields.io/badge/python-3.10+-1B1E22?style=flat-square&logo=python&logoColor=F0E6D2" />
+<img src="https://img.shields.io/badge/license-GPL--3.0-C9A84C?style=flat-square" />
+<img src="https://img.shields.io/badge/MCP-1.0+-3D5060?style=flat-square" />
+<img src="https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-2C3B4A?style=flat-square" />
+<img src="https://img.shields.io/badge/tests-101%20passed-4A6741?style=flat-square" />
+<img src="https://img.shields.io/badge/vanilla_DB-40K_events_|_5.6K_focuses-C9A84C?style=flat-square&logoColor=1B1E22" />
 
 </div>
 
@@ -249,5 +256,5 @@ This project is built upon the foundational work of **[Agentic-HOI4-Modding](htt
 </div>
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1C2A35,2E4A62,3F6B8C,5C8FB8&height=120&section=footer" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1B1E22,2C3B4A,3D5060,C9A84C&height=120&section=footer" />
 </div>
