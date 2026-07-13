@@ -1,7 +1,5 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1A1F2E,263248,3D4F3F,C9A84C&height=140&section=header&fontSize=0&animation=fadeIn" />
-  <br/>
-  <img src="assets/banner-title.png" width="640" alt="HOI4-MCP" />
+  <img src="assets/banner-title.gif" width="640" alt="HOI4-MCP" />
 </div>
 
 <table align="center" border="0" cellpadding="6" cellspacing="0">
@@ -261,8 +259,4 @@ This project is built upon the foundational work of **[Agentic-HOI4-Modding](htt
 •
 [MCP Server](hoi4-mcp-server/)
 
-</div>
-
-<div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0,1A1F2E,263248,3D4F3F,C9A84C&height=120&section=footer" />
 </div>

@@ -4,7 +4,8 @@
 Produces:
   assets/gear-cluster-left.gif   — 3-gear cluster (left variant)
   assets/gear-cluster-right.gif  — 3-gear cluster (right variant, mirrored)
-  assets/banner-title.png        — Military-style title plate
+  assets/banner-title.gif        — Animated military title plate
+                                   with pixel-art tank firing animation
 
 All gear clusters feature a large central gear with two smaller meshing
 satellite gears, with proper tooth ratios and counter-rotation.
@@ -241,113 +242,202 @@ def generate_cluster_gif(gears: list[GearDef], path: Path, label: str):
 
 BANNER_W = 640
 BANNER_H = 140
+BANNER_FRAMES = 30
+BANNER_DURATION = 60  # ms per frame
+
+# ── Pixel art tank sprite (from reference: green body, black outline) ──────
+# Characters: #=outline(black), G=body(dark olive), g=body highlight
+#             B=barrel, T=tread dark, W=wheel, .=transparent
+TANK_W = 36  # sprite columns
+TANK_H = 16  # sprite rows
+
+TANK_SPRITE = [
+    # 0         1         2         3
+    # 0123456789012345678901234567890123456
+    list("..................................."),  # 0
+    list("...................####..........."),  # 1
+    list("..................#GGGG#.........."),  # 2
+    list(".................#gGGGG##........."),  # 3
+    list("......####.......#GGGGGG#........."),  # 4
+    list("......#BB#######GgGGGGG#........."),  # 5  barrel starts
+    list("......#BBB#GGGG#GGGGGG#........."),  # 6
+    list("......####B#GGGG#GGGGGG#........."),  # 7
+    list(".........#B#GGGG#GGGGG##........"),  # 8
+    list(".........##B#GGG#GGGG#G##......."),  # 9  turret/hull
+    list("..........###GGG#GGG#GGG##......"),  # 10 hull slope
+    list("............#GGGGGGGGGGG##......"),  # 11 hull bottom
+    list("............#TTTTTTTTTTT##......"),  # 12 tread top
+    list("...........#TWWTTWWTTWWT##......"),  # 13 wheels
+    list("...........################....."),  # 14 tread bottom
+    list("..................................."),  # 15
+]
+
+TANK_COLORS = {
+    '#': (20, 22, 18),     # black outline
+    'G': (75, 90, 55),     # dark olive body
+    'g': (95, 110, 72),    # lighter olive highlight
+    'B': (55, 65, 42),     # barrel (slightly darker)
+    'T': (38, 42, 32),     # tread
+    'W': (58, 62, 50),     # wheel
+    '.': None,              # transparent
+}
+
+# Animation: barrel recoil + muzzle flash sequence
+# (barrel_x_shorten, flash_pixels_list)
+FIRING_SEQUENCE = [
+    (0, []),                     # idle
+    (0, []),                     # idle
+    (0, []),                     # idle
+    (0, []),                     # idle
+    (-2, []),                    # barrel starts recoil
+    (-4, [(5, 6), (5, 7), (6, 5), (6, 6), (4, 6)]),  # muzzle flash!
+    (-3, [(5, 6), (6, 5)]),      # fading flash
+    (-1, []),                    # recovering
+    (0, []),                     # back to idle
+    (0, []),                     # idle
+]
 
 
-def draw_rivet(draw: ImageDraw.ImageDraw, x: int, y: int):
-    """Draw a single metal rivet with highlight and shadow."""
-    r = 5
-    draw.ellipse([x - r, y - r, x + r, y + r], fill=RIVET_COLOR)
-    draw.ellipse([x - r + 2, y - r + 1, x + r - 2, y + r - 3],
-                 fill=RIVET_HIGHLIGHT)
-    draw.point((x - 1, y - 1), fill=(180, 185, 190))
+def draw_tank(draw: ImageDraw.ImageDraw, ox: int, oy: int,
+              barrel_shorten: int, flashes: list[tuple[int, int]],
+              px: int = 2):
+    """Draw pixel-art tank at (ox, oy). barrel_shorten > 0 shortens the barrel."""
+    for row_idx, row in enumerate(TANK_SPRITE):
+        for col_idx, ch in enumerate(row):
+            color = TANK_COLORS.get(ch)
+            if color is None:
+                continue
+
+            # Shorten barrel: skip barrel pixels at the right end
+            eff_col = col_idx
+            if ch in ('B',) and barrel_shorten > 0 and col_idx >= 8:
+                # Check if this barrel pixel is near the tip
+                barrel_rightmost = max(c for c, v in enumerate(row) if v == 'B')
+                if col_idx > barrel_rightmost - barrel_shorten:
+                    continue  # skip this pixel (barrel recoiled)
+
+            x = ox + eff_col * px
+            y = oy + row_idx * px
+            draw.rectangle(
+                [x, y, x + px - 1, y + px - 1], fill=color)
+
+    # Muzzle flash (yellow-orange ellipses)
+    for fr, fc in flashes:
+        fx = ox + fc * px
+        fy = oy + fr * px
+        for di, fclr in enumerate(
+            [(255, 240, 60), (255, 200, 30), (255, 150, 15), (255, 100, 10)]
+        ):
+            r = 3 - di
+            if r > 0:
+                draw.ellipse(
+                    [fx - r, fy - r, fx + r, fy + r], fill=fclr)
 
 
-def draw_chevron(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int):
-    """Draw a small military chevron marker (▶)."""
-    pts = [
-        (cx - size, cy - size),
-        (cx + size, cy),
-        (cx - size, cy + size),
-    ]
-    draw.polygon(pts, fill=GOLD)
-
-
-def generate_banner() -> None:
-    """Generate the military-style title banner plate."""
-    img = Image.new("RGBA", (BANNER_W, BANNER_H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    # ── Background plate with subtle border ──
-    margin = 4
+# ── Static plate (background, borders, rivets, text) ──────────────────────
+def draw_static_plate(draw: ImageDraw.ImageDraw):
+    """Draw the non-animated military title plate background."""
+    m = 4
     draw.rounded_rectangle(
-        [margin, margin, BANNER_W - margin, BANNER_H - margin],
-        radius=8, fill=BANNER_BG, outline=BANNER_BORDER, width=2,
-    )
+        [m, m, BANNER_W - m, BANNER_H - m],
+        radius=8, fill=BANNER_BG, outline=BANNER_BORDER, width=2)
 
-    # ── Inner decorative border (thin gold line) ──
-    inner_m = 12
-    draw.rectangle(
-        [inner_m, inner_m, BANNER_W - inner_m, BANNER_H - inner_m],
-        outline=GOLD_DARK, width=1,
-    )
+    im = 12
+    draw.rectangle([im, im, BANNER_W - im, BANNER_H - im],
+                   outline=GOLD_DARK, width=1)
 
-    # ── Corner rivets ──
+    # Rivets (corners + midpoints)
     for rx, ry in [(20, 20), (BANNER_W - 20, 20),
                    (20, BANNER_H - 20), (BANNER_W - 20, BANNER_H - 20)]:
-        draw_rivet(draw, rx, ry)
-    # Extra rivets along top/bottom edges
+        r = 5
+        draw.ellipse([rx - r, ry - r, rx + r, ry + r], fill=RIVET_COLOR)
+        draw.ellipse([rx - r + 2, ry - r + 1, rx + r - 2, ry + r - 3],
+                     fill=RIVET_HIGHLIGHT)
+        draw.point((rx - 1, ry - 1), fill=(180, 185, 190))
     for rx in [BANNER_W // 2 - 80, BANNER_W // 2 + 80]:
-        draw_rivet(draw, rx, 20)
-        draw_rivet(draw, rx, BANNER_H - 20)
+        for ry in [20, BANNER_H - 20]:
+            r = 5
+            draw.ellipse([rx - r, ry - r, rx + r, ry + r], fill=RIVET_COLOR)
+            draw.ellipse([rx - r + 2, ry - r + 1, rx + r - 2, ry + r - 3],
+                         fill=RIVET_HIGHLIGHT)
+            draw.point((rx - 1, ry - 1), fill=(180, 185, 190))
 
-    # ── Top accent line with chevrons ──
-    line_y = 32
-    draw.line([(30, line_y), (BANNER_W - 30, line_y)], fill=GOLD_DARK, width=1)
+    # Top accent line + chevrons
+    ly = 32
+    draw.line([(30, ly), (BANNER_W - 30, ly)], fill=GOLD_DARK, width=1)
     for cx in [BANNER_W // 2 - 60, BANNER_W // 2 + 60]:
-        draw_chevron(draw, cx, line_y, 5)
+        draw.polygon([(cx - 5, ly - 5), (cx + 5, ly), (cx - 5, ly + 5)],
+                     fill=GOLD)
 
-    # ── Bottom accent line ──
-    line_y2 = BANNER_H - 28
-    draw.line([(30, line_y2), (BANNER_W - 30, line_y2)], fill=GOLD_DARK, width=1)
+    # Bottom accent line + chevrons
+    ly2 = BANNER_H - 30
+    draw.line([(30, ly2), (BANNER_W - 30, ly2)], fill=GOLD_DARK, width=1)
     for cx in [BANNER_W // 2 - 60, BANNER_W // 2 + 60]:
-        draw_chevron(draw, cx, line_y2, 5)
+        draw.polygon([(cx - 5, ly2 - 5), (cx + 5, ly2), (cx - 5, ly2 + 5)],
+                     fill=GOLD)
 
-    # ── Title text: "HOI4-MCP" ──
-    try:
-        font_title = ImageFont.truetype(FONT_GOTHIC, 52)
-        font_sub = ImageFont.truetype(FONT_NARROW_BOLD, 18)
-    except OSError:
-        font_title = ImageFont.load_default()
-        font_sub = ImageFont.load_default()
 
-    title = "HOI4-MCP"
-    subtitle = "AI-ASSISTED  HOI4  MODDING  FRAMEWORK"
+# ── Animated banner generation ─────────────────────────────────────────────
+def generate_animated_banner() -> None:
+    """Generate animated military title banner with pixel tank firing."""
+    frames = []
 
-    # Title with gold gradient effect (draw dark shadow first, then gold)
-    tx = BANNER_W // 2
-    ty = 62
+    # Tank positioned bottom-left
+    tank_x = 20
+    tank_y = BANNER_H - 8 - TANK_H * 2  # 2px per pixel
 
-    # Shadow
-    bbox_s = draw.textbbox((0, 0), title, font=font_title)
-    tw_s = bbox_s[2] - bbox_s[0]
-    draw.text((tx - tw_s // 2 + 2, ty - 16 + 2), title,
-              fill=(10, 12, 16), font=font_title)
-    # Main gold text
-    draw.text((tx - tw_s // 2, ty - 16), title,
-              fill=GOLD, font=font_title)
-    # Light highlight on top half
-    draw.text((tx - tw_s // 2, ty - 18), title,
-              fill=GOLD_LIGHT, font=font_title)
+    for i in range(BANNER_FRAMES):
+        img = Image.new("RGBA", (BANNER_W, BANNER_H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
-    # Subtitle
-    bbox_sub = draw.textbbox((0, 0), subtitle, font=font_sub)
-    sw = bbox_sub[2] - bbox_sub[0]
-    draw.text((tx - sw // 2, ty + 30), subtitle,
-              fill=(180, 190, 200), font=font_sub)
+        draw_static_plate(draw)
 
-    # ── Small tactical crosses flanking subtitle ──
-    cross_size = 4
-    for cxx in [tx - sw // 2 - 20, tx + sw // 2 + 20]:
-        cyy = ty + 38
-        draw.line([(cxx - cross_size, cyy), (cxx + cross_size, cyy)],
-                  fill=GOLD_DARK, width=1)
-        draw.line([(cxx, cyy - cross_size), (cxx, cyy + cross_size)],
-                  fill=GOLD_DARK, width=1)
+        # Title text
+        try:
+            font_title = ImageFont.truetype(FONT_GOTHIC, 52)
+            font_sub = ImageFont.truetype(FONT_NARROW_BOLD, 18)
+        except OSError:
+            font_title = ImageFont.load_default()
+            font_sub = ImageFont.load_default()
 
-    # ── Save ──
-    path = ASSETS_DIR / "banner-title.png"
-    img.save(str(path))
-    print(f"✅ Banner title: {path}")
+        title = "HOI4-MCP"
+        subtitle = "AI-ASSISTED  HOI4  MODDING  FRAMEWORK"
+        TX, TY = BANNER_W // 2, 60
+
+        bb = draw.textbbox((0, 0), title, font=font_title)
+        tw = bb[2] - bb[0]
+        draw.text((TX - tw // 2 + 2, TY - 16 + 2), title,
+                  fill=(10, 12, 16), font=font_title)
+        draw.text((TX - tw // 2, TY - 16), title, fill=GOLD, font=font_title)
+        draw.text((TX - tw // 2, TY - 18), title, fill=GOLD_LIGHT, font=font_title)
+
+        bb2 = draw.textbbox((0, 0), subtitle, font=font_sub)
+        sw = bb2[2] - bb2[0]
+        draw.text((TX - sw // 2, TY + 30), subtitle,
+                  fill=(180, 190, 200), font=font_sub)
+
+        # Tactical crosses
+        cs = 4
+        for cxx in [TX - sw // 2 - 20, TX + sw // 2 + 20]:
+            cyy = TY + 38
+            draw.line([(cxx - cs, cyy), (cxx + cs, cyy)], fill=GOLD_DARK, width=1)
+            draw.line([(cxx, cyy - cs), (cxx, cyy + cs)], fill=GOLD_DARK, width=1)
+
+        # Animated tank
+        seq = FIRING_SEQUENCE[i % len(FIRING_SEQUENCE)]
+        barrel_shorten, flashes = seq
+        recoil_x = -1 if barrel_shorten > 0 else 0
+        draw_tank(draw, tank_x + recoil_x, tank_y, barrel_shorten, flashes, px=2)
+
+        frames.append(img)
+
+    path = ASSETS_DIR / "banner-title.gif"
+    frames[0].save(
+        str(path), save_all=True, append_images=frames[1:],
+        duration=BANNER_DURATION, loop=0, disposal=2,
+        transparency=0, optimize=False,
+    )
+    print(f"✅ Banner title (animated): {path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -358,5 +448,5 @@ if __name__ == "__main__":
                          "Left cluster")
     generate_cluster_gif(GEARS_RIGHT, ASSETS_DIR / "gear-cluster-right.gif",
                          "Right cluster")
-    generate_banner()
+    generate_animated_banner()
     print("✅ All banner assets generated.")
