@@ -899,3 +899,62 @@ A focus tree task is complete only when:
 If a tree uses a fallback tree where the spec requires a bespoke tree, report it as a simplification.
 
 If no simplifications were made, say so and provide evidence.
+
+## Real-World Patterns (from Kaiserreich scan)
+
+### Log Convention — Always First in completion_reward
+```txt
+completion_reward = {
+    log = "[GetLogRoot]: Focus Completed <focus_id>"
+    # ... actual rewards
+}
+```
+This logs focus completion to the game log, making debugging focus tree navigation trivial.
+
+### ai_will_do Patterns
+```txt
+# Always take ASAP
+ai_will_do = { factor = 100 }
+
+# Date-gated (don't take before date)
+ai_will_do = { factor = 100; modifier = { factor = 0; date < 1938.1.1 } }
+
+# Flag-gated (don't take if flag set)
+ai_will_do = { factor = 500; modifier = { factor = 0; has_country_flag = bad_path } }
+
+# Conditionally boosted (prefer if condition)
+ai_will_do = { factor = 100; modifier = { factor = 5; has_idea = my_idea } }
+```
+
+### select_effect — For Pre-Completion Event Chains
+Use `select_effect` when clicking the focus should fire events BEFORE the focus completes. Common for diplomatic focuses that need immediate narrative feedback.
+```txt
+focus = {
+    id = BUL_diplomacy
+    select_effect = {
+        TUR = { country_event = { id = bulgaria_events.50 days = 1 } }
+        country_event = { id = bulgaria_events.51 }
+    }
+}
+```
+
+### bypass — Conditional Auto-Complete
+```txt
+bypass = { has_global_flag = balkan_war_ended }
+```
+
+### uncomplete_national_focus — Repeatable Focuses
+```txt
+uncomplete_national_focus = yes  # Player can take this focus again
+```
+
+### ID Range Pre-Allocation Comments
+At the top of event files, pre-allocate ID ranges for clarity:
+```txt
+# Intro                  (ireland_events.0 -> ireland_events.6)
+# Black Monday           (ireland_events.7 -> ireland_events.12)
+# Pre-Elections          (ireland_events.13 -> ireland_events.20)
+```
+
+### search_filters — Always Include
+Every focus should have `search_filters = { <relevant_tags> }` for the in-game focus search.

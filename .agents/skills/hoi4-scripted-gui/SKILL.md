@@ -68,3 +68,43 @@ my_gui = {
 - [ ] `clipping = yes` containers have explicit `width`/`height`
 - [ ] Textboxes have `maxWidth`/`maxHeight` set
 - [ ] GUI is registered in `interface/` with `on_open` handler
+
+<!-- GAP-020:COMPLETED — Real-world patterns from Toolpack + Global Market mod scans -->
+
+## Real-World Patterns
+
+### Flag-Based State Machine (Toolpack)
+Every interactive element uses global flags for state. Toggle buttons set/clear flags; visibility checks flags.
+```txt
+my_button_on_click = { set_global_flag = my_feature_enabled }
+my_button_off_click = { clr_global_flag = my_feature_enabled }
+my_button_on_visible = { NOT = { has_global_flag = my_feature_enabled } }
+```
+
+### Mutually Exclusive Radio Pattern
+Setting one flag clears all siblings — no radio group widget needed.
+```txt
+option_a_on_click = { set_global_flag = option_a; clr_global_flag = option_b; clr_global_flag = option_c }
+```
+
+### Multi-Target Mark & Batch Execute
+Mark targets with flags, then execute on `every_country`/`every_state` with that flag.
+```txt
+batch_execute = { every_country = { limit = { has_country_flag = marked } <effects>; clr_country_flag = marked } }
+```
+
+### Confirmation Flow
+Actions set a confirm flag + open confirmation window. The confirmation GUI reads the flag to determine action.
+```txt
+request_confirm = { set_global_flag = confirm_delete; set_global_flag = tp_open_confirmation_window }
+confirm_effect = { if = { limit = { has_global_flag = confirm_delete } <delete_effect> } }
+```
+
+### Dynamic Lists from Arrays (Toolpack MP Action Log)
+Use `dynamic_lists` to render scrollable lists from variable arrays.
+```txt
+dynamic_lists = { my_list_grid = { array = global.my_data_array; index = i; value = v; entry_container = my_entry } }
+```
+
+### Pure Scripted GUI Architecture (Global Market mod)
+Entire systems can run without ANY decisions. All interaction through scripted GUIs with flag-based navigation tabs, global variable economies, and custom calendar systems. Use when the vanilla decision UI doesn't fit the mechanic.

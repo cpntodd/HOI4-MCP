@@ -331,7 +331,7 @@ class TestExportImport:
 class TestSeeder:
     def test_seeds_empty_db(self, db):
         result = seed_if_empty(db)
-        assert result["seeded"] == 8  # 8 hardcoded constraints
+        assert result["seeded"] == 14  # 8 original + 6 from mod scans
         assert result["skipped"] == 0
         # Verify one of them
         rule = db.get_by_id("LR-0001")
@@ -480,8 +480,8 @@ class TestStats:
     def test_stats_after_seed(self, db):
         seed_if_empty(db)
         stats = db.stats()
-        assert stats["total"] == 8
-        assert stats["active"] == 8
+        assert stats["total"] == 14
+        assert stats["active"] == 14
         assert stats["resolved"] == 0
         assert len(stats["by_category"]) > 0
 
