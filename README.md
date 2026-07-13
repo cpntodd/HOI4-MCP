@@ -16,6 +16,8 @@ Turns any AI coding assistant into a Hearts of Iron IV modding expert — determ
 <img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" />
 <img src="https://img.shields.io/badge/MCP-1.0+-purple?style=flat-square" />
 <img src="https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey?style=flat-square" />
+<img src="https://img.shields.io/badge/tests-101%20passed-brightgreen?style=flat-square" />
+<img src="https://img.shields.io/badge/vanilla%20DB-40K%20events%20%7C%205.6K%20focuses-blue?style=flat-square" />
 
 </div>
 
@@ -120,73 +122,50 @@ Next session: get_learned_rules() → rule loaded → mistake PREVENTED
 - **Deduplication** via Jaccard token-overlap similarity — no ML dependencies
 - **Dual-source capture**: agent self-corrections + human corrections
 - **Recurring pattern detection** from game error logs
-- **Promotion path**: high-occurrence rules graduate to permanent documentation
 - **`.jsonl` export** for team sharing via git — one rule per line, diff-friendly
+
+---
+
+### 📖 Documentation
+
+| Page | Contents |
+|------|----------|
+| **[Setup Guide](docs/SETUP.md)** | Prerequisites, installation, vanilla DB build, VS Code config, troubleshooting |
+| **[Usage Guide](docs/USAGE.md)** | Tool reference, common workflows, agent integration, skill loading, testing |
+| **[Test Results](TEST-RESULTS.md)** | Comprehensive benchmarks across 6 reference mods + vanilla game |
+| **[Project Audit](PROJECT-AUDIT.md)** | 25-gap analysis, implementation status, action plan |
+
+---
+
+### ✅ Verified Against
+
+| Mod | Size | Index | Events | Loc Keys | Errors |
+|-----|------|-------|--------|----------|--------|
+| Parliament GUI | 196K | <0.1s | 0 | 12 | 0 |
+| Global Market | 2.8M | 0.4s | 16 | 638 | 0 |
+| Greater Macedonia | 17M | 0.2s | 0 | 5,163 | 0 |
+| Toolpack | 14M | 0.7s | 5 | 1,045 | 0 |
+| Old World Blues | 3.6G | 21.4s | 1,360 | 124,607 | 0 |
+| Kaiserreich | 1.2G | 51.0s | 19,558 | 252,105 | 0 |
+| **Vanilla 1.19.x** | — | ~60s | **40,040** | — | 0 |
+
+**101 automated tests passing. All 6 reference mods index with zero errors.**  
+See **[TEST-RESULTS.md](TEST-RESULTS.md)** for full breakdown.
 
 ---
 
 ### Quick Start
 
-#### 1. Install
+See **[docs/SETUP.md](docs/SETUP.md)** for detailed instructions. Quick version:
 
 ```bash
-cd hoi4-mcp-server
-pip install -e .
-```
-
-#### 2. Build Vanilla Database (one-time)
-
-```bash
+cd hoi4-mcp-server && pip install -e .
 index-vanilla --vanilla-path "/path/to/Hearts of Iron IV"
+# Add mcp.json config → Reload VS Code → Done
 ```
 
-Parses all vanilla game files into `~/.hoi4_mcp/vanilla.db`. Takes 1-2 minutes.
-
-#### 3. Configure VS Code
-
-**User-level** (`~/.config/Code/User/mcp.json`) — available in all workspaces:
-
-```json
-{
-  "servers": {
-    "hoi4-modder": {
-      "type": "stdio",
-      "command": "/path/to/hoi4-mcp-server/.venv/bin/python",
-      "args": [
-        "-m", "hoi4_mcp.server",
-        "--vanilla-db", "~/.hoi4_mcp/vanilla.db"
-      ],
-      "env": {
-        "HOI4_MOD_PATH": "/path/to/your/mod"
-      }
-    }
-  }
-}
-```
-
-**Per-workspace** (`.vscode/mcp.json` in mod root) — overrides for specific mods:
-
-```json
-{
-  "servers": {
-    "hoi4-modder": {
-      "type": "stdio",
-      "command": "/path/to/hoi4-mcp-server/.venv/bin/python",
-      "args": [
-        "-m", "hoi4_mcp.server",
-        "--mod-path", "/path/to/this/mod",
-        "--vanilla-db", "~/.hoi4_mcp/vanilla.db"
-      ]
-    }
-  }
-}
-```
-
-Reload VS Code (`Ctrl+Shift+P` → `Developer: Reload Window`) after configuration.
-
-#### 4. Verify
-
-Ask your AI agent: *"List the active learned rules"* — if it returns 8 seed rules, everything is connected.
+Full setup walkthrough, CLI reference, troubleshooting: **[docs/SETUP.md](docs/SETUP.md)**  
+Tool reference, workflows, agent integration: **[docs/USAGE.md](docs/USAGE.md)**
 
 ---
 
@@ -195,18 +174,27 @@ Ask your AI agent: *"List the active learned rules"* — if it returns 8 seed ru
 ```
 HOI4-MCP/
 ├── hoi4-modder.agent.md         # AI agent persona + 4-phase workflow
-├── SKILL.md                     # Comprehensive HOI4 syntax reference
-├── PROJECT-AUDIT.md             # 25-gap audit + action plan
-├── .agents/skills/              # 10 domain design guides
-│   ├── hoi4-events/
-│   ├── hoi4-focus-trees/
-│   ├── hoi4-decisions-missions/
-│   ├── hoi4-feature-assets/
-│   ├── hoi4-feature-planning/
-│   ├── hoi4-frame-animation/
-│   ├── hoi4-improvement-loop/
-│   ├── hoi4-mtth/
-│   ├── hoi4-subagents/
+├── SKILL.md                     # HOI4 syntax reference (18 systems, 1,800+ lines)
+├── AGENTS.md                    # Project-wide conventions
+├── PROJECT-AUDIT.md             # 25-gap analysis + action plan
+├── TEST-RESULTS.md              # Benchmarks across 6 reference mods
+├── docs/                        # Documentation
+│   ├── SETUP.md                 # Setup guide
+│   └── USAGE.md                 # Usage guide
+├── .agents/
+│   ├── skills/                  # 15 domain design guides
+│   └── checklists/              # 16 platform-agnostic audit checklists
+├── .codex/agents/               # 16 Codex-specific subagent definitions
+├── hoi4-mcp-server/
+│   ├── src/hoi4_mcp/
+│   │   ├── server.py            # FastMCP — 14 tools + 2 resources
+│   │   ├── clausewitz/          # Tokenizer, parser, validator
+│   │   ├── tools/               # Indexer, ID manager, error log, packager, report
+│   │   ├── db/                  # Vanilla HOI4 → SQLite (40K events, 5.6K focuses)
+│   │   └── learning/            # Adaptive mistake memory (14 seed rules)
+│   ├── tests/                   # pytest — 101 tests in 0.18s
+│   └── scripts/setup.sh
+└── paradox_wiki/                # 30+ offline reference pages + INDEX.md
 │   └── hoi4-text-audio-research/
 ├── hoi4-mcp-server/
 │   ├── src/hoi4_mcp/
