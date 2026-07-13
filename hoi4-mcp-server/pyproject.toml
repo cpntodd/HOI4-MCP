@@ -1,0 +1,26 @@
+[project]
+name = "hoi4-mcp-server"
+version = "0.1.0"
+description = "MCP server for Hearts of Iron IV modding — indexer, validator, vanilla DB lookup, and error log parsing"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "watchdog>=4.0",
+]
+
+[project.scripts]
+hoi4-mcp = "hoi4_mcp.server:main"
+index-vanilla = "hoi4_mcp.db.vanilla_index:main"
+
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
