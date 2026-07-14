@@ -61,6 +61,61 @@ have been generated in the first place.
 
 <!-- LEARN:END -->
 
+### Phase 0.5: Parallel Mod Discovery (⛔ MANDATORY — before ANY Clausewitz code)
+
+Before generating ANY Clausewitz script (events, focuses, decisions, ideas, etc.),
+you MUST run a parallel discovery batch. This grounds you in the actual state of
+the mod and vanilla game — eliminating hallucinated IDs, non-existent modifiers,
+and duplicate collisions.
+
+**Core Triad — run these THREE simultaneously before every code-generation task:**
+
+| # | Tool | Purpose |
+|---|------|---------|
+| 1 | `get_mod_index` | Complete map of mod IDs, namespaces, tokens, localisation keys |
+| 2 | `get_learned_rules` | All previously recorded mistakes for this system (use correct `context_tags`) |
+| 3 | `search_mod` | Existing mod files using similar IDs or patterns (prevent duplicates) |
+
+**Supplemental — add as needed based on task:**
+
+| # | Tool | When REQUIRED |
+|---|------|---------------|
+| 4 | `lookup_vanilla` | **ANY time you reference a vanilla ID, modifier, focus, event, idea, decision, character, country tag, effect name, or trigger name.** No exceptions — not even for "obvious" ones like `GER` or `political_power`. |
+| 5 | `get_next_id` | Before creating any new event, focus, decision, or character ID |
+| 6 | `check_id_exists` | Before using any ID you're unsure about |
+
+> **⛔ THE "I KNOW THIS" FALLACY IS FORBIDDEN.** Never skip `lookup_vanilla`
+> because you "already know" a vanilla ID. Mods and DLCs can override anything.
+> Always verify. Every time. No exceptions.
+
+**Synthesis:** After ALL parallel calls return, confirm:
+1. The planned IDs don't collide (mod index + check_id_exists)
+2. All vanilla references actually exist (lookup_vanilla)
+3. The mod doesn't use custom scripted effects/triggers instead of vanilla ones (mod index)
+4. Known anti-patterns for this system are avoided (learned rules)
+5. The mod's existing patterns for similar content are followed (search_mod)
+
+> **Reference:** See `.github/skills/parallel-mod-discovery/SKILL.md` for the full
+> parallel discovery strategy with examples and context tag reference.
+
+### Memory & Continuity Protocol (⛔ MANDATORY)
+
+**On every session start:**
+1. Read `.github/agent-memory/MEMORY.md` in its entirety
+2. Summarize what you learned from memory at the top of your first reply
+3. If working on a mod, also check for `.hoi4-agent-memory.md` in the mod root
+
+**After every meaningful change:**
+- Append a new entry to `.github/agent-memory/MEMORY.md` with:
+  - What changed (files + description)
+  - Decisions made (rationale, alternatives rejected)
+  - Known issues / next steps
+  - Context snapshot (branch, relevant files)
+- If working on a mod, also append to the mod's `.hoi4-agent-memory.md`
+
+> **Rule:** Never overwrite existing memory entries. Append only.
+> The hooks system auto-logs edits, but you must add the DECISION rationale manually.
+
 ### Phase 1 — Establish Mod Context (CRITICAL FOR UNDERSTANDING)
 Before writing ANY code, you must understand the user's specific mod. Do not rely solely on vanilla knowledge.
 
@@ -90,6 +145,19 @@ Before writing ANY code, you must understand the user's specific mod. Do not rel
 3. **Check error.log.** If the user reports a bug, use `get_latest_errors` (MCP) or locate and read their `error.log` manually to diagnose root causes before proposing fixes.
 4. **Hybrid vanilla lookup.** Use `lookup_vanilla` (MCP) for exact vanilla IDs from the local database. When MCP is unavailable, use the `hoi4-modding-reference` skill for cached vanilla IDs and patterns. When neither covers something, search the HOI4 game install directory at runtime.
 
+**⛔ Verify-Before-Write Checklist — confirm ALL items before editing any mod file:**
+
+| # | Check | How to verify |
+|---|-------|---------------|
+| ☐ | Mod index loaded this session | `get_mod_index` has been called |
+| ☐ | All vanilla IDs verified | Every referenced vanilla ID, modifier, effect, trigger, country tag confirmed via `lookup_vanilla` |
+| ☐ | All new IDs are collision-free | `get_next_id` + `check_id_exists` for every new event/focus/decision/idea key |
+| ☐ | Mod's existing patterns checked | `search_mod` for related IDs to confirm the mod doesn't already have similar content |
+| ☐ | Learned rules loaded for this system | `get_learned_rules` with correct `context_tags` |
+| ☐ | Related mod files read | At least 1 existing file of the same type read to match conventions (namespace, formatting, scope chains) |
+
+> If any checkbox is empty, DO NOT generate code. Complete the missing verification first.
+
 ### Phase 3 — Generate Code
 1. **Teach with intent.** For non-trivial patterns, add a "**Why:**" callout.
 2. **Bracket discipline.** Clausewitz script requires exact `{` `}` matching. Every block MUST be closed.
@@ -99,16 +167,22 @@ Before writing ANY code, you must understand the user's specific mod. Do not rel
 ### Phase 4 — Self-Correction Loop (LEARNS FROM MISTAKES)
 When you generate or edit code, you are responsible for ensuring it works. Do not just dump code and wait for the user to test it.
 1. **Pre-Flight Check (MCP):** If the MCP server is connected, call `validate_syntax` on every file you create or edit. This catches bracket errors, YML format issues, and duplicate IDs BEFORE the game launches. Fix all reported issues before proceeding.
-2. **Pre-Flight Check (Manual):** If MCP is unavailable, re-read the code you just generated. Check against the "Common Pitfalls" in the skill reference.
-3. **Proactive Error Handling:** If the user says "I got an error" or "it crashed":
+2. **Pre-Flight Verification Report:** Before delivering generated code, state explicitly:
+   - Which `lookup_vanilla` calls you made and what they confirmed
+   - Which `get_next_id` / `check_id_exists` calls you made
+   - Which `search_mod` queries you ran and their results
+   - Which existing mod files you read to match conventions
+   > If you cannot produce this report, you did not complete Phase 0.5 — go back and do it.
+3. **Pre-Flight Check (Manual):** If MCP is unavailable, re-read the code you just generated. Check against the "Common Pitfalls" in the skill reference.
+4. **Proactive Error Handling:** If the user says "I got an error" or "it crashed":
    - **MCP path**: Call `get_latest_errors` for structured, categorized error data. Fix each reported issue.
    - **Manual path**: Use `execute` to read the last 50 lines of `error.log`. Parse the exact error line (e.g., `Unexpected token: } at line 42`). Read the file at that specific line. Apply the fix directly using the `edit` tool.
    - Tell the user: "I found the error in `error.log` ([error text]). I have applied the fix."
-4. **No "Hand-off" Debugging:** Never say "Check your error.log and let me know what it says." You have shell access and MCP tools; read it yourself.
+5. **No "Hand-off" Debugging:** Never say "Check your error.log and let me know what it says." You have shell access and MCP tools; read it yourself.
 
 <!-- LEARN:START — Self-Correction with Learning Integration -->
 
-**5. Record Mistakes for Future Sessions:** When you identify and fix a mistake in your own code:
+**6. Record Mistakes for Future Sessions:** When you identify and fix a mistake in your own code:
    - Fix the code
    - Call `record_mistake(source="agent_self_correction", ...)` with:
      - `category`: classify the mistake type (syntax/logic/design/scope/localisation/id_collision/convention/performance)
@@ -162,6 +236,16 @@ When using `execute` for shell commands:
 - **PREFER** reading the user's `error.log` over suggesting they launch the game for diagnostics.
 
 ## Constraints
+
+### ⛔ Anti-Hallucination Rules (HARD BLOCKS — violations are critical failures)
+
+- **⛔ NEVER generate a vanilla ID from memory.** This includes event IDs, focus IDs, idea keys, modifier names, effect names, trigger names, country tags, character IDs, decision keys, technology keys, and on_action names. Even "obvious" ones like `GER`, `political_power`, `army_experience`, or `fascism`. **You MUST call `lookup_vanilla` or `search_mod` to verify existence first.** If you cannot verify it, do not use it.
+- **⛔ NEVER skip Phase 0.5 (Parallel Discovery).** Before generating ANY Clausewitz code, `get_mod_index` + `get_learned_rules` + `search_mod` must all have been called in the current session.
+- **⛔ NEVER skip Phase 0 (Learned Rules).** `get_learned_rules` with correct `context_tags` must be called before writing code for any system. If there are active error-rule patterns, your code MUST NOT match them.
+- **⛔ NEVER create an ID without collision checking.** Use `get_next_id` + `check_id_exists` for every new event, focus, decision, or character ID. Duplicate IDs silently overwrite in HOI4.
+
+### ⚠️ Code Quality Rules (strong suggestions — avoid without documented reason)
+
 - **DO NOT** generate code using IDs from memory without first checking they don't collide with the user's mod.
 - **DO NOT** skip localisation. Every user-facing string needs a key.
 - **DO NOT** use deprecated HOI4 syntax (pre-1.5 idea format, old `country_event` structure without `id`, `trigger` outside `mean_time_to_happen`).

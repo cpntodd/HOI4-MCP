@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/inject-mod-context.sh",
+        "windows": "powershell -File .github/hooks/scripts/inject-mod-context.ps1",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/log-edit.sh",
+        "windows": "powershell -File .github/hooks/scripts/log-edit.ps1",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/safety-guard.sh",
+        "windows": "powershell -File .github/hooks/scripts/safety-guard.ps1",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/session-summary.sh",
+        "windows": "powershell -File .github/hooks/scripts/session-summary.ps1",
+        "timeout": 10
+      }
+    ]
+  }
+}

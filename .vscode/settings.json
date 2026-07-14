@@ -1,0 +1,27 @@
+{
+  "chat.promptFilesLocations": {
+    ".github/prompts": true
+  },
+  "chat.hookFilesLocations": {
+    ".github/hooks": true
+  },
+  "chat.agentFilesLocations": {
+    ".github/agents": true
+  },
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/*.pyc": true,
+    "hoi4-mcp-server/.venv": true,
+    "hoi4-mcp-server/build": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "hoi4-mcp-server/.venv": true
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
