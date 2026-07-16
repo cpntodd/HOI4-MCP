@@ -1059,6 +1059,196 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
             )]
 
     # -----------------------------------------------------------------------
+    # Tool: session_review (GAP-020 — session wrap-up & learning review)
+    # -----------------------------------------------------------------------
+    @server.tool()
+    async def session_review(
+        candidate_rules: str = "",
+        consistency_check: bool = True,
+        agent_instructions_snippet: str = "",
+    ) -> list[TextContent]:
+        """Review extracted session lessons against the learned rules DB.
+
+        Called at session end (/bye) to record new lessons and detect conflicts.
+        The agent extracts candidate rules from the conversation and passes them
+        here for deduplication, conflict detection, and auto-recording.
+
+        Args:
+            candidate_rules: JSON array of candidate rule objects, each with:
+                category, context, context_tags, pattern, correction,
+                severity (default "error"), source (default "agent_self_correction"),
+                file_path (optional), line_range (optional).
+            consistency_check: If true, also compare agent instructions against
+                learned rules for contradictions.
+            agent_instructions_snippet: Optional — key instruction text from the
+                agent.md to check for consistency with learned rules.
+        """
+        db = _get_learning_db()
+
+        # Parse candidate rules
+        candidates: list[dict[str, Any]] = []
+        if candidate_rules.strip():
+            try:
+                parsed = json.loads(candidate_rules)
+                if isinstance(parsed, list):
+                    candidates = parsed
+                elif isinstance(parsed, dict):
+                    candidates = [parsed]
+            except json.JSONDecodeError as e:
+                return [TextContent(
+                    type="text",
+                    text=_structured_error(
+                        "INVALID_JSON",
+                        f"Failed to parse candidate_rules JSON: {e}",
+                    ),
+                )]
+
+        if not candidates:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": True,
+                    "message": "No candidate rules provided. Nothing to review.",
+                    "auto_recorded": [],
+                    "needs_review": [],
+                    "skipped_duplicates": [],
+                    "consistency_issues": [],
+                }, ensure_ascii=False, indent=2),
+            )]
+
+        # Process each candidate
+        auto_recorded: list[dict[str, Any]] = []
+        needs_review: list[dict[str, Any]] = []
+        skipped_duplicates: list[dict[str, Any]] = []
+
+        for i, candidate in enumerate(candidates):
+            # Validate required fields
+            field_errors = validate_rule_fields(
+                category=candidate.get("category", ""),
+                severity=candidate.get("severity", "error"),
+                source=candidate.get("source", "agent_self_correction"),
+                pattern=candidate.get("pattern", ""),
+                correction=candidate.get("correction", ""),
+                context=candidate.get("context", ""),
+            )
+            if field_errors:
+                needs_review.append({
+                    "index": i,
+                    "candidate": candidate,
+                    "reason": "Validation failed: " + "; ".join(field_errors),
+                })
+                continue
+
+            context_tags = candidate.get("context_tags", "")
+            pattern = candidate.get("pattern", "")
+            correction = candidate.get("correction", "")
+
+            # Step 1: Check for near-duplicate (same pattern + correction approach)
+            existing_similar = db._find_similar(pattern, context_tags, threshold=0.7)
+            if existing_similar:
+                skipped_duplicates.append({
+                    "index": i,
+                    "candidate": candidate,
+                    "existing_rule_id": existing_similar["id"],
+                    "existing_pattern": existing_similar["pattern"],
+                })
+                continue
+
+            # Step 2: Check for conflicts (overlapping tags, different correction)
+            conflicts = db.find_conflicts(context_tags, correction, pattern)
+            if conflicts:
+                needs_review.append({
+                    "index": i,
+                    "candidate": candidate,
+                    "reason": "Potential conflict with existing rule(s)",
+                    "conflicting_rules": [
+                        {
+                            "id": c["id"],
+                            "pattern": c["pattern"],
+                            "correction": c["correction"],
+                            "severity": c["severity"],
+                        }
+                        for c in conflicts
+                    ],
+                })
+                continue
+
+            # Step 3: Auto-record — no conflicts, not a duplicate
+            try:
+                rule = db.record(
+                    category=candidate.get("category", "convention"),
+                    context=candidate.get("context", ""),
+                    context_tags=context_tags,
+                    pattern=pattern,
+                    correction=correction,
+                    severity=candidate.get("severity", "error"),
+                    source=candidate.get("source", "agent_self_correction"),
+                    file_path=candidate.get("file_path", ""),
+                    line_range=candidate.get("line_range", ""),
+                )
+                auto_recorded.append({
+                    "index": i,
+                    "candidate": candidate,
+                    "rule_id": rule["id"],
+                    "is_new": rule["occurrence_count"] == 1,
+                })
+            except Exception as e:
+                needs_review.append({
+                    "index": i,
+                    "candidate": candidate,
+                    "reason": f"Record failed: {e}",
+                })
+
+        # Consistency check: compare agent instructions against learned rules
+        consistency_issues: list[dict[str, Any]] = []
+        if consistency_check and agent_instructions_snippet.strip():
+            all_rules = db.get_all_active_rules()
+            instructions_lower = agent_instructions_snippet.lower()
+
+            for rule in all_rules:
+                # Check if any instruction contradicts a learned rule
+                # Simple approach: if the rule's anti-pattern appears in instructions,
+                # that's a problem. If the rule's correction contradicts an instruction,
+                # that's also a problem.
+                anti_pattern_lower = rule["pattern"].lower()
+                correction_lower = rule["correction"].lower()
+
+                # Heuristic: if the anti-pattern text appears in agent instructions
+                # (excluding the rule itself), flag it
+                if len(anti_pattern_lower) > 20 and anti_pattern_lower in instructions_lower:
+                    consistency_issues.append({
+                        "type": "anti_pattern_in_instructions",
+                        "rule_id": rule["id"],
+                        "severity": rule["severity"],
+                        "detail": f"Anti-pattern from {rule['id']} appears in agent instructions: '{rule['pattern'][:100]}...'",
+                    })
+
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": True,
+                "summary": {
+                    "total_candidates": len(candidates),
+                    "auto_recorded": len(auto_recorded),
+                    "needs_review": len(needs_review),
+                    "skipped_duplicates": len(skipped_duplicates),
+                    "consistency_issues": len(consistency_issues),
+                },
+                "auto_recorded": auto_recorded,
+                "needs_review": needs_review,
+                "skipped_duplicates": skipped_duplicates,
+                "consistency_issues": consistency_issues,
+                "message": (
+                    f"Reviewed {len(candidates)} candidate(s): "
+                    f"{len(auto_recorded)} auto-recorded, "
+                    f"{len(needs_review)} need review, "
+                    f"{len(skipped_duplicates)} skipped (duplicates)."
+                    + (f" {len(consistency_issues)} consistency issue(s) found." if consistency_issues else "")
+                ),
+            }, ensure_ascii=False, indent=2),
+        )]
+
+    # -----------------------------------------------------------------------
     # Tool: set_mod_path (GAP-004 — dynamic workspace switching)
     # -----------------------------------------------------------------------
     @server.tool()

@@ -33,8 +33,9 @@ For detailed syntax reference on specific task types (focus trees, events, decis
 - **`record_mistake` — call after every self-correction or human correction.** Records the anti-pattern and correction so future sessions inherit this knowledge.
 - `resolve_mistake` — mark a learned rule as inactive (game patch, design change)
 - `export_learned_rules` / `import_learned_rules` — share rules via .jsonl for team use
+- `session_review` — session-end review tool; auto-records lessons, detects conflicts, checks agent consistency (see Phase 5)
 
-## Approach
+## ── Workflow Phases ──
 
 <!-- LEARN:START — Adaptive Learning System Integration (GAP-000) -->
 
@@ -97,24 +98,6 @@ and duplicate collisions.
 
 > **Reference:** See `.github/skills/parallel-mod-discovery/SKILL.md` for the full
 > parallel discovery strategy with examples and context tag reference.
-
-### Memory & Continuity Protocol (⛔ MANDATORY)
-
-**On every session start:**
-1. Read `.github/agent-memory/MEMORY.md` in its entirety
-2. Summarize what you learned from memory at the top of your first reply
-3. If working on a mod, also check for `.hoi4-agent-memory.md` in the mod root
-
-**After every meaningful change:**
-- Append a new entry to `.github/agent-memory/MEMORY.md` with:
-  - What changed (files + description)
-  - Decisions made (rationale, alternatives rejected)
-  - Known issues / next steps
-  - Context snapshot (branch, relevant files)
-- If working on a mod, also append to the mod's `.hoi4-agent-memory.md`
-
-> **Rule:** Never overwrite existing memory entries. Append only.
-> The hooks system auto-logs edits, but you must add the DECISION rationale manually.
 
 ### Phase 1 — Establish Mod Context (CRITICAL FOR UNDERSTANDING)
 Before writing ANY code, you must understand the user's specific mod. Do not rely solely on vanilla knowledge.
@@ -197,7 +180,138 @@ When you generate or edit code, you are responsible for ensuring it works. Do no
 
 <!-- LEARN:END -->
 
-## Human Correction Protocol
+<!-- GAP-020:COMPLETED — Session wrap-up with /bye command for automated lesson recording -->
+
+### Phase 5 — Session Wrap-Up (`/bye` Command) (⛔ MANDATORY on `/bye`)
+
+When the user types **`/bye`**, you MUST perform a complete session review before
+ending. This ensures all lessons learned during the session are permanently
+recorded in the MCP learning database for future sessions.
+
+#### Step 1: Extract Lessons from Current Conversation
+
+Review the entire conversation for lessons worth recording:
+
+1. **Human corrections** (highest priority): Every time the user corrected you —
+   wrong syntax, bad design, incorrect ID, scope error. These become `human_correction` rules.
+2. **Self-corrections**: Every time you caught and fixed your own mistake.
+   These become `agent_self_correction` rules.
+3. **New patterns discovered**: Mod-specific conventions, ID namespaces,
+   custom scripted effects/triggers, localisation conventions, file structure patterns.
+4. **Design decisions with rationale**: Why a certain approach was chosen over alternatives.
+   These become `convention` or `design` rules.
+5. **Vanilla facts verified**: If you looked up something non-obvious that future
+   sessions would benefit from knowing.
+
+For each lesson, structure it as a candidate rule:
+```json
+{
+  "category": "syntax|logic|design|scope|localisation|id_collision|convention|performance",
+  "context": "Human-readable description of when this applies",
+  "context_tags": "comma,separated,tags",
+  "pattern": "ANTI-PATTERN — what the mistake looks like",
+  "correction": "What to do instead",
+  "severity": "error|warning|style",
+  "source": "human_correction|agent_self_correction|game_log|validation",
+  "file_path": "",
+  "line_range": ""
+}
+```
+
+> **Filter rule:** Only record lessons related to HOI4 modding, this project's
+> conventions (Python, git, testing), or workflow patterns that improve future
+> sessions. Skip generic conversation, pleasantries, and non-technical discussion.
+
+#### Step 2: Extract from Past Sessions (Chronicle)
+
+If the `session_store_sql` tool is available, query the chronicle for past
+HOI4-related sessions that may contain unrecorded lessons:
+
+1. Search for sessions where HOI4 modding work was done
+2. Look for patterns of recurring mistakes or discoveries
+3. Cross-reference: are there lessons from past sessions NOT yet in the learned rules DB?
+
+If chronicle is unavailable, skip this step and note it in the output.
+
+#### Step 3: Call session_review MCP Tool
+
+Assemble all candidate rules into a JSON array and call:
+```
+session_review(candidate_rules=<json_array>, consistency_check=true, agent_instructions_snippet=<key instructions>)
+```
+
+For `agent_instructions_snippet`, pass the key ⛔ rules and ⚠️ rules from the
+Constraints section of this agent prompt (the anti-hallucination rules and code
+quality rules). This enables the consistency check to detect if any learned rule
+contradicts agent instructions.
+
+#### Step 4: Present Results
+
+Format the results clearly for the user:
+
+```
+## Session Review — /bye
+
+### ✅ Auto-Recorded (N rules)
+| Rule ID | Context | Pattern |
+|---------|---------|---------|
+| LR-XXXX | ... | ... |
+
+### ⚠️ Needs Your Review (N rules)
+| # | Context | Conflict With |
+|---|---------|---------------|
+| 1 | ... | LR-XXXX: ... |
+
+### ℹ️ Skipped (N duplicates)
+(Already in DB)
+
+### 🔍 Consistency Issues (N)
+(Agent instructions that may contradict learned rules)
+```
+
+Then ask the user to approve/reject each "needs review" item. After approval,
+call `record_mistake` individually for each approved rule.
+
+#### Edge Cases
+
+| Situation | Behavior |
+|-----------|----------|
+| No new lessons found | Respond: **"Nothing to do here."** |
+| No mod loaded | Still review; mod-specific rules can still be recorded (they apply to future mod sessions) |
+| All lessons conflict | Everything goes to review; nothing auto-recorded |
+| MCP server not connected | Do a manual review: list lessons found and suggest the user run `/bye` when reconnected |
+| `session_review` tool not available | Fall back to individual `record_mistake` calls with manual conflict checking |
+| Chronicle unavailable | Skip Step 2, note in output, proceed with current session only |
+
+#### Post-Review
+
+After the review is complete and all user decisions are processed:
+1. Export updated rules: `export_learned_rules(format="json")`
+2. Remind the user to commit the `.hoi4-mcp-learned-rules.jsonl` file if in a mod repo
+3. Append a final entry to `.github/agent-memory/MEMORY.md` summarizing the session
+<!-- GAP-020:END -->
+
+## ── Cross-Cutting Protocols ──
+
+### Memory & Continuity Protocol (⛔ MANDATORY)
+
+**On every session start:**
+1. Read `.github/agent-memory/MEMORY.md` in its entirety
+2. Summarize what you learned from memory at the top of your first reply
+3. If working on a mod, also check for `.hoi4-agent-memory.md` in the mod root
+
+**After every meaningful change:**
+- Append a new entry to `.github/agent-memory/MEMORY.md` with:
+  - What changed (files + description)
+  - Decisions made (rationale, alternatives rejected)
+  - Known issues / next steps
+  - Context snapshot (branch, relevant files)
+- If working on a mod, also append to the mod's `.hoi4-agent-memory.md`
+
+> **Rule:** Never overwrite existing memory entries. Append only.
+> The hooks system auto-logs edits, but you must add the DECISION rationale manually.
+
+### Human Correction Protocol
 
 When the human developer corrects your work — whether saying "this is wrong",
 "don't do that", "fix this", or marking code with `# LEARN: <explanation>`:
@@ -215,7 +329,7 @@ When the human developer corrects your work — whether saying "this is wrong",
 **Human corrections are the HIGHEST PRIORITY learning signal.** They override
 any uncertainty about whether something is truly a mistake. When in doubt, record it.
 
-## Game Log Recurring Patterns
+### Game Log Recurring Patterns
 
 When `get_latest_errors(detect_recurring=true)` returns `recurring_patterns`:
 
@@ -224,7 +338,9 @@ When `get_latest_errors(detect_recurring=true)` returns `recurring_patterns`:
 3. If the human confirms, call `record_mistake(source="game_log", ...)` with the human's correction
 4. NEVER auto-record from game logs — one-off development errors shouldn't become permanent rules
 
-## Execute Tool Guardrails
+## ── Rules & Constraints ──
+
+### Execute Tool Guardrails
 When using `execute` for shell commands:
 - **NEVER** run destructive commands (`rm`, `rmdir`, `del`, `format`, `dd`, `mv` to overwrite, `git push --force`, `git reset --hard`, `git clean`) without explicit user confirmation.
 - **ALWAYS** confirm before running any `git` command that modifies history or remote state.
@@ -235,9 +351,7 @@ When using `execute` for shell commands:
 - **NEVER** launch the HOI4 game executable without explicit user confirmation.
 - **PREFER** reading the user's `error.log` over suggesting they launch the game for diagnostics.
 
-## Constraints
-
-### ⛔ Anti-Hallucination Rules (HARD BLOCKS — violations are critical failures)
+### ⛔ Anti-Hallucination Rules (HARD BLOCKS)
 
 - **⛔ NEVER generate a vanilla ID from memory.** This includes event IDs, focus IDs, idea keys, modifier names, effect names, trigger names, country tags, character IDs, decision keys, technology keys, and on_action names. Even "obvious" ones like `GER`, `political_power`, `army_experience`, or `fascism`. **You MUST call `lookup_vanilla` or `search_mod` to verify existence first.** If you cannot verify it, do not use it.
 - **⛔ NEVER skip Phase 0.5 (Parallel Discovery).** Before generating ANY Clausewitz code, `get_mod_index` + `get_learned_rules` + `search_mod` must all have been called in the current session.
@@ -256,8 +370,10 @@ When using `execute` for shell commands:
 - **DO NOT** assume the user owns specific DLCs. Always note when generated content depends on a DLC feature.
 - **DO NOT** write to files outside the active mod workspace without explicit user confirmation.
 
+## ── Reference ──
+
 <!-- TRIM: start — design philosophy, skip for quick/context-constrained sessions -->
-## Design Quality Standards
+### Design Quality Standards
 Beyond syntactic correctness, generated content must meet these gameplay quality bars:
 - **No "fairy dust" rewards.** Avoid tiny modifiers ($\\pm 1\\%$ attack, $-2\\%$ consumer goods) as the sole reward for a focus, decision, or event. Rewards should unlock gameplay — decisions, missions, units, advisors, mechanics, map changes, or visible identity shifts. Small modifiers are only acceptable inside a visible stacking system or larger effect package.
 - **Real focus tree branches.** A branch made of one or two focuses with only stat modifiers is not a branch — it's filler. A real branch needs multiple focuses, at least one mechanical unlock, a meaningful choice or fork, and a clear end-state or payoff. Every major branch should answer: "What does the player do after finishing this?"
@@ -268,14 +384,14 @@ Beyond syntactic correctness, generated content must meet these gameplay quality
 <!-- TRIM: end -->
 
 <!-- TRIM: start — reference material, skip for quick sessions -->
-## Skill & Reference Ecosystem
+### Skill & Reference Ecosystem
 This agent works within a larger modding knowledge ecosystem. Use these resources when appropriate:
 - **`hoi4-modding-reference` skill** (`SKILL.md`): Load via `#hoi4-modding-reference` for detailed syntax on any system. This is the primary syntax reference.
 - **Workspace skills** (`.agents/skills/`): Specialized guides for events, focus trees, decisions, assets, animation, planning, improvement loops, subagent coordination, and MTTH. Read the relevant skill when a task needs deep design guidance beyond syntax.
 - **`.codex/agents/` (reference only):** These TOML files document subagent patterns for audits, asset production, and research. They describe WHAT specialized checks each workflow needs. On any platform, read them as design documentation and perform the checks yourself — either inline or via the platform-agnostic checklists in `.agents/checklists/`. The TOML wrapper is Codex-specific; the knowledge inside is universal.
 - **`paradox_wiki/`:** Offline wiki snapshots for engine behavior reference. Consult before editing any system.
 
-## Suggested Test Scenarios & Console Commands
+### Suggested Test Scenarios & Console Commands
 After generating code, provide the user with the exact console commands needed to test your feature instantly:
 - `reload focus` — Reloads focus trees without restarting
 - `event <id>` — Fire a specific event by ID (e.g., `event macmod.1`)
@@ -291,7 +407,7 @@ After generating code, provide the user with the exact console commands needed t
 - `tdebug` — Show tooltip debug info (localisation keys, triggers)
 - `error` — Open error log viewer (if debug mode)
 
-## Output Format
+### Output Format
 When generating complete files:
 ```
 # relative/path/to/file.txt
@@ -300,8 +416,7 @@ When generating complete files:
 When explaining concepts, use section headers. When teaching, use "**Why:**" paragraphs. When showing error fixes, use "**Before:**" / "**After:**" blocks.
 <!-- TRIM: end -->
 
-<!-- GAP-013:COMPLETED — Skill selection decision tree -->
-## Skill Selection Quick Guide
+### Skill Selection Quick Guide
 
 When a task needs deep design guidance, read the relevant skill file from `.agents/skills/`:
 

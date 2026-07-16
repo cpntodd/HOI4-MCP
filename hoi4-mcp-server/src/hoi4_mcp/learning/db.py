@@ -409,3 +409,78 @@ class LearnedRulesDB:
                 best_match = rule
 
         return best_match
+
+    # ── Conflict Detection (for session_review) ───────────────
+
+    def find_conflicts(
+        self, context_tags: str, correction: str, pattern: str = ""
+    ) -> list[dict[str, Any]]:
+        """Find existing rules that may conflict with a candidate rule.
+
+        A conflict is: overlapping context_tags but DIFFERENT correction.
+        This is used by session_review to flag rules needing human review.
+
+        Returns list of potentially conflicting existing rules (empty = no conflict).
+        """
+        conn = self._connect()
+        all_active = conn.execute(
+            "SELECT * FROM learned_rules WHERE resolved = 0"
+        ).fetchall()
+
+        if not all_active:
+            return []
+
+        new_tags = set(t.strip().lower() for t in context_tags.split(",") if t.strip())
+        new_correction_tokens = set(correction.lower().split())
+        new_pattern_tokens = set(pattern.lower().split()) if pattern else set()
+
+        conflicts: list[dict[str, Any]] = []
+
+        for row in all_active:
+            rule = dict(row)
+            existing_tags = set(
+                t.strip().lower() for t in rule["context_tags"].split(",") if t.strip()
+            )
+
+            # Must have at least 1 overlapping tag
+            if not (new_tags & existing_tags):
+                continue
+
+            existing_correction_tokens = set(rule["correction"].lower().split())
+
+            # If corrections are highly similar, it's NOT a conflict (it's a duplicate/near-duplicate)
+            if new_correction_tokens and existing_correction_tokens:
+                union_c = len(new_correction_tokens | existing_correction_tokens)
+                correction_sim = (
+                    len(new_correction_tokens & existing_correction_tokens) / union_c
+                    if union_c else 0.0
+                )
+                if correction_sim >= 0.7:
+                    continue  # Same correction approach — not a conflict
+
+            # Also check if patterns are similar (same mistake, different fix = conflict)
+            if new_pattern_tokens:
+                existing_pattern_tokens = set(rule["pattern"].lower().split())
+                if existing_pattern_tokens:
+                    union_p = len(new_pattern_tokens | existing_pattern_tokens)
+                    pattern_sim = (
+                        len(new_pattern_tokens & existing_pattern_tokens) / union_p
+                        if union_p else 0.0
+                    )
+                    # High pattern similarity + low correction similarity = CONFLICT
+                    if pattern_sim >= 0.5:
+                        conflicts.append(rule)
+                        continue
+
+            # Overlapping tags but different corrections → potential conflict
+            conflicts.append(rule)
+
+        return conflicts
+
+    def get_all_active_rules(self) -> list[dict[str, Any]]:
+        """Return all active (non-resolved) rules. Used for consistency checks."""
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT * FROM learned_rules WHERE resolved = 0 ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]

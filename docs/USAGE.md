@@ -72,6 +72,7 @@ lookup_vanilla(query_type="modifier", query="army_attack_factor")
 | `resolve_mistake` | Deactivate a rule | `rule_id`, `note`, `superseded_by` |
 | `export_learned_rules` | Export to .jsonl | `format` (json/markdown), `include_resolved` |
 | `import_learned_rules` | Import from .jsonl | `input_path` |
+| `session_review` | Session-end review & auto-record | `candidate_rules`, `consistency_check`, `agent_instructions_snippet` |
 
 **Example:**
 ```
@@ -93,6 +94,33 @@ record_mistake(
 |------|---------|---------------|
 | `generate_province_rgb` | Unused RGB colors | `definition_csv_path` |
 | `set_mod_path` | Switch mod at runtime | `mod_path`, `auto_detect` |
+
+### Session Review
+
+| Tool | Purpose | Key Parameters |
+|------|---------|---------------|
+| `session_review` | Review & record session lessons | `candidate_rules` (JSON array), `consistency_check`, `agent_instructions_snippet` |
+
+The `session_review` tool is called by the agent during `/bye` (Phase 5). It:
+- Checks each candidate lesson against the learned rules DB for duplicates
+- Detects conflicts (overlapping context tags + different correction)
+- Auto-records non-conflicting rules
+- Flags conflicting rules for human review
+- Optionally checks agent instructions for consistency with learned rules
+
+**Example response:**
+```json
+{
+  "summary": {
+    "total_candidates": 5,
+    "auto_recorded": 3,
+    "needs_review": 1,
+    "skipped_duplicates": 1,
+    "consistency_issues": 0
+  },
+  "message": "Reviewed 5 candidate(s): 3 auto-recorded, 1 need review, 1 skipped (duplicates)."
+}
+```
 
 ---
 
@@ -139,6 +167,24 @@ record_mistake(
 3. Team member: import_learned_rules(input_path="rules.jsonl") # Import on fresh setup
 ```
 
+### Workflow 5: End Session with `/bye`
+
+```
+1. Type /bye in chat                                             # Trigger Phase 5
+2. Agent reviews conversation for lessons                        # Human corrections, self-corrections, patterns
+3. Agent queries chronicle for past unrecorded lessons           # Cross-reference session history
+4. Agent calls session_review(candidate_rules=<json>)            # Auto-record + conflict detection
+5. Review results:                                                #
+   - ✅ Auto-recorded rules (accepted)                           #
+   - ⚠️ Rules needing your approval (conflicts found)            #
+   - ℹ️ Skipped duplicates                                       #
+6. Export updated rules: export_learned_rules(format="json")     # Save for team sharing
+```
+
+**What `/bye` records:** Human corrections (highest priority), agent self-corrections, new mod patterns discovered, design decisions with rationale, verified vanilla facts.
+
+**Auto-approval rules:** A lesson is auto-recorded if no existing rule has overlapping `context_tags` with a *different* correction. If tags overlap but corrections differ → flagged for human review. Exact duplicates are silently skipped.
+
 ---
 
 ## Agent Integration (for AI Agents)
@@ -175,6 +221,20 @@ record_mistake(
     ... same fields as above ...
 )
 ```
+
+### Session Wrap-Up (`/bye` Command — Phase 5)
+
+When the user types `/bye`, the agent MUST perform a complete session review:
+
+1. **Extract lessons** from the current conversation (human corrections, self-corrections, new patterns, design decisions)
+2. **Query chronicle** for past sessions with unrecorded HOI4 lessons
+3. **Call `session_review`** with all candidate rules — the tool auto-records non-conflicting rules, flags conflicts for review
+4. **Present results**: auto-recorded ✅, needs review ⚠️, skipped duplicates ℹ️, consistency issues 🔍
+5. **Export** updated rules via `export_learned_rules(format="json")`
+
+If no new lessons are found, respond: **"Nothing to do here."**
+
+See `hoi4-modder.agent.md` → Phase 5 for the full specification.
 
 ### Skill Loading Guide
 

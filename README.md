@@ -77,14 +77,15 @@ When an AI helps you mod HOI4, it wastes enormous context on:
 ├──────────────────────────────────────────────────────────┤
 │                 MCP Server Layer                          │
 │  ┌───────────────────────────────────────────────────┐   │
-│  │ FastMCP Server — 13 tools + 2 resources           │   │
+│  │ FastMCP Server — 14 tools + 2 resources           │   │
 │  │ • get_mod_index     • get_learned_rules           │   │
 │  │ • search_mod        • record_mistake              │   │
 │  │ • validate_syntax   • resolve_mistake             │   │
 │  │ • lookup_vanilla    • export_learned_rules         │   │
 │  │ • get_next_id       • import_learned_rules         │   │
 │  │ • check_id_exists   • get_latest_errors            │   │
-│  │ • generate_province_rgb                            │   │
+│  │ • session_review    • generate_province_rgb        │   │
+│  │ • set_mod_path                                     │   │
 │  └───────────────────────────────────────────────────┘   │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────────┐   │
 │  │ clausewitz/  │ │ tools/       │ │ learning/      │   │
@@ -122,6 +123,8 @@ When an AI helps you mod HOI4, it wastes enormous context on:
 | `resolve_mistake` | Learning | Mark a rule as inactive (game patch, design change) |
 | `export_learned_rules` | Learning | Export rules as `.jsonl` for team sharing via git |
 | `import_learned_rules` | Learning | Import shared rules on fresh setups |
+| `session_review` | Learning | Session-end review — auto-records lessons, detects conflicts, checks agent consistency |
+| `set_mod_path` | Runtime | Switch active mod without server restart |
 
 ---
 
@@ -189,7 +192,7 @@ Tool reference, workflows, agent integration: **[docs/USAGE.md](docs/USAGE.md)**
 
 ```
 HOI4-MCP/
-├── hoi4-modder.agent.md         # AI agent persona + 4-phase workflow
+├── hoi4-modder.agent.md         # AI agent persona + 5-phase workflow (4 tiers)
 ├── SKILL.md                     # HOI4 syntax reference (18 systems, 1,800+ lines)
 ├── AGENTS.md                    # Project-wide conventions
 ├── TEST-RESULTS.md              # Benchmarks across 6 reference mods
@@ -213,7 +216,7 @@ HOI4-MCP/
 │   └── hoi4-text-audio-research/
 ├── hoi4-mcp-server/
 │   ├── src/hoi4_mcp/
-│   │   ├── server.py            # FastMCP server — 13 tools + 2 resources
+│   │   ├── server.py            # FastMCP server — 14 tools + 2 resources
 │   │   ├── clausewitz/          # Clausewitz .txt tokenizer, parser, validator
 │   │   ├── tools/               # Mod indexer, ID manager, error log, HTML report
 │   │   ├── db/                  # Vanilla HOI4 → SQLite builder + query
@@ -235,11 +238,15 @@ HOI4-MCP/
 
 ---
 
+### Recently Completed (GAP-020)
+
+- **Session Review System** — `/bye` command triggers automated lesson extraction from current + past sessions, conflict detection against existing learned rules, and consistency checks between agent instructions and the learning DB. New `session_review` MCP tool with `find_conflicts` DB method.
+- **Agent.md restructured** — Reorganized from flat structure into 4 logical tiers: Workflow Phases (0-5), Cross-Cutting Protocols, Rules & Constraints, Reference.
+
 ### Current Focus
 
 - Expanding syntax reference coverage for remaining HOI4 modding systems
 - Converting Codex-specific subagent patterns to platform-agnostic checklists
-- Adding multi-mod workspace switching to the MCP server
 - Building CI/CD pipeline with automated testing
 - Extracting subagent knowledge into cross-platform checklists for DeepSeek, Claude, Z.AI
 

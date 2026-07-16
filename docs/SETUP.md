@@ -134,9 +134,35 @@ The server starts without a mod path. These tools work without any mod:
 - `get_latest_errors` — parse the HOI4 error log
 - `get_learned_rules` / `record_mistake` — learning system
 - `export_learned_rules` / `import_learned_rules` — rule sharing
+- `session_review` — session-end lesson review
 
 These tools require a mod path:
 - `get_mod_index`, `search_mod`, `get_next_id`, `check_id_exists`, `generate_province_rgb`
+
+---
+
+## Agent Setup
+
+### Agent Mode Configuration
+
+To use the HOI4 modder agent, copy or reference `hoi4-modder.agent.md` as a custom agent mode in your AI assistant. In VS Code with GitHub Copilot, this is configured automatically by the workspace settings.
+
+### Agent Commands
+
+The agent responds to the following slash commands:
+
+| Command | Phase | Description |
+|---------|-------|-------------|
+| `/bye` | Phase 5 | End session — triggers automated lesson review, conflict detection, and learning DB update |
+
+**What `/bye` does:**
+1. Reviews the entire conversation for lessons (human corrections, self-corrections, patterns)
+2. Queries the chronicle for past sessions with unrecorded HOI4 lessons
+3. Calls `session_review` to auto-record non-conflicting rules and flag conflicts
+4. Presents a summary: auto-recorded ✅, needs review ⚠️, skipped duplicates ℹ️
+5. Exports updated rules for team sharing
+
+If no new lessons are found, the agent responds: **"Nothing to do here."**
 
 ---
 

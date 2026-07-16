@@ -32,3 +32,96 @@
 ---
 
 <!-- Agent session entries are appended below this line -->
+
+---
+### [2026-07-14 18:55] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+---
+### [2026-07-14 18:56] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+---
+### [2026-07-14 18:57] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+### [2026-07-16 23:16] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/hoi4-mcp-server/src/hoi4_mcp/learning/db.py`
+
+### [2026-07-16 23:16] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/hoi4-mcp-server/src/hoi4_mcp/server.py`
+
+### [2026-07-16 23:17] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/hoi4-modder.agent.md`
+
+---
+### [2026-07-16 23:18] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+---
+### [2026-07-16 23:18] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+### [2026-07-16 23:20] Auto-logged edit
+- Tool: `multi_replace_string_in_file`  File: `unknown`
+
+### [2026-07-16 23:21] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/hoi4-modder.agent.md`
+
+### [2026-07-16 23:21] Auto-logged edit
+- Tool: `multi_replace_string_in_file`  File: `unknown`
+
+---
+### [2026-07-16 23:22] ⏹ Session ended
+- Branch at close: `main`
+- Review entries above and complete the Session Completion Checklist:
+  - [ ] All new IDs verified with check_id_exists / get_next_id?
+  - [ ] All vanilla references verified with lookup_vanilla?
+  - [ ] All new files passed validate_syntax?
+  - [ ] Mistakes recorded via record_mistake?
+---
+
+### [2026-07-16 23:24] Auto-logged edit
+- Tool: `multi_replace_string_in_file`  File: `unknown`
+
+### [2026-07-16 23:24] Auto-logged edit
+- Tool: `multi_replace_string_in_file`  File: `unknown`
+
+### [2026-07-16 23:24] Auto-logged edit
+- Tool: `multi_replace_string_in_file`  File: `unknown`
+
+### [2026-07-16 23:24] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/docs/USAGE.md`
+
+### [2026-07-16 23:25] Auto-logged edit
+- Tool: `replace_string_in_file`  File: `/mnt/Data/Projects/HOI4-MCP/docs/SETUP.md`
