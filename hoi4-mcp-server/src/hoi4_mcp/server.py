@@ -28,6 +28,35 @@ from .clausewitz.validator import (
 from .tools.indexer import ModIndexer
 from .tools.id_manager import IDManager
 from .tools.error_log import error_log_summary, parse_error_log, find_error_log
+from .tools.fuzzy_replace import (
+    replace as fuzzy_replace,
+    ReplaceError,
+    NotFoundError,
+    MultipleMatchesError,
+    DisproportionateMatchError,
+    REPLACE_LADDER_INFO,
+)
+from .tools.skill_tool import (
+    SkillRegistry,
+    discover_skills,
+    build_skill_tool_response,
+    build_skills_preamble,
+)
+from .tools.compaction import (
+    estimate_total_tokens,
+    microcompact_messages,
+    snip_history,
+    needs_compaction,
+    build_compaction_prompt,
+    COMPACTABLE_TOOLS,
+)
+from .tools.loop import (
+    LoopState,
+    build_round_prompt,
+    decide as loop_decide,
+)
+from .assembly import build_agent_context, build_skill_registry_for_tool
+from .sessions import SessionStore, Session, SessionSummary
 from .db.vanilla_index import VanillaLookup, VanillaDBBuilder
 from .learning import (
     LearnedRulesDB,
@@ -1346,6 +1375,269 @@ def create_hoi4_server(config: ServerConfig) -> FastMCP:
                 "focuses": focus_count,
                 "message": f"Switched to mod: {mod_name} ({event_count} events, {focus_count} focuses). All caches invalidated.",
             }, ensure_ascii=False),
+        )]
+
+    # -----------------------------------------------------------------------
+    # Tool: fuzzy_edit (GAP-021 — 9-strategy fuzzy replace for Clausewitz)
+    # -----------------------------------------------------------------------
+    @server.tool()
+    async def fuzzy_edit(
+        file_path: str = "",
+        old_string: str = "",
+        new_string: str = "",
+        replace_all: bool = False,
+        dry_run: bool = False,
+    ) -> list[TextContent]:
+        """Edit a mod file using 9-strategy fuzzy matching for Clausewitz .txt files.
+
+        HOI4 Clausewitz script files have notoriously inconsistent whitespace
+        (mixed tabs/spaces, trailing whitespace, blank-line variance). Exact-match
+        edits fail constantly. This tool tries 9 progressively looser matching
+        strategies — from exact match through whitespace normalization to
+        context-aware anchor matching.
+
+        Strategies (tried in order):
+        1. Exact string match
+        2. Line-trimmed (strips each line, handles trailing whitespace)
+        3. Block-anchor (first/last line anchor, ±25% size variance, Levenshtein)
+        4. Whitespace-normalized (collapses all whitespace)
+        5. Indentation-flexible (dedents both sides — handles copy-paste drift)
+        6. Escape-normalized (unescapes \\n/\\t/\\" in find string)
+        7. Trimmed-boundary (strips leading/trailing whitespace)
+        8. Context-aware (first/last line anchor + ≥50% interior match)
+        9. Multi-occurrence (finds all occurrences)
+
+        Includes a safety guard that rejects replacements far larger than
+        old_string (prevents accidental block deletion).
+
+        Args:
+            file_path: Absolute or mod-relative path to the file to edit.
+            old_string: The text to find and replace.
+            new_string: The replacement text.
+            replace_all: If true, replace ALL occurrences (default: replace first unique match).
+            dry_run: If true, report what would be changed without writing.
+        """
+        if not file_path:
+            return [TextContent(
+                type="text",
+                text=_structured_error("MISSING_PATH", "file_path is required")
+            )]
+        if not old_string:
+            return [TextContent(
+                type="text",
+                text=_structured_error("MISSING_OLD_STRING", "old_string is required")
+            )]
+
+        # Resolve path — support both absolute and mod-relative
+        fp = Path(file_path)
+        if not fp.is_absolute() and _has_mod():
+            fp = _state["mod_path"] / file_path
+
+        if not fp.exists():
+            return [TextContent(
+                type="text",
+                text=_structured_error(
+                    "FILE_NOT_FOUND",
+                    f"File not found: {fp}",
+                    help="Provide an absolute path or a path relative to the mod root."
+                )
+            )]
+
+        try:
+            content = fp.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            return [TextContent(
+                type="text",
+                text=_structured_error("READ_FAILED", f"Cannot read {fp}: {e}")
+            )]
+
+        try:
+            new_content, strategy = fuzzy_replace(content, old_string, new_string, replace_all=replace_all)
+        except NotFoundError:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error": "NOT_FOUND",
+                    "message": (
+                        "Could not find old_string in the file using any of 9 matching "
+                        "strategies. The text must exist in the file. Try re-reading the "
+                        "file to get the exact current text, including all whitespace."
+                    ),
+                    "strategies_tried": list(REPLACE_LADDER_INFO["strategies"]),
+                }, indent=2)
+            )]
+        except MultipleMatchesError:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error": "MULTIPLE_MATCHES",
+                    "message": (
+                        "Found multiple matches for old_string. Provide more surrounding "
+                        "context (additional lines before/after) to make the match unique, "
+                        "or set replace_all=true to replace all occurrences."
+                    ),
+                }, indent=2)
+            )]
+        except DisproportionateMatchError as e:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "success": False,
+                    "error": "DISPROPORTIONATE",
+                    "message": str(e),
+                }, indent=2)
+            )]
+        except ValueError as e:
+            return [TextContent(
+                type="text",
+                text=_structured_error("INVALID_INPUT", str(e))
+            )]
+
+        if dry_run:
+            # Compute a minimal diff preview
+            old_lines = content.split("\n")
+            new_lines = new_content.split("\n")
+            changed = sum(1 for o, n in zip(old_lines, new_lines) if o != n)
+            changed += abs(len(old_lines) - len(new_lines))
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "dry_run": True,
+                    "file": str(fp),
+                    "strategy_used": strategy,
+                    "lines_changed": changed,
+                    "content_preview": new_content[:2000] + ("..." if len(new_content) > 2000 else ""),
+                }, indent=2)
+            )]
+
+        # Write the file
+        try:
+            fp.write_text(new_content, encoding="utf-8")
+        except Exception as e:
+            return [TextContent(
+                type="text",
+                text=_structured_error("WRITE_FAILED", f"Cannot write {fp}: {e}")
+            )]
+
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "success": True,
+                "file": str(fp),
+                "strategy_used": strategy,
+                "replace_all": replace_all,
+                "message": f"File edited successfully using '{strategy}' strategy.",
+            }, indent=2)
+        )]
+
+    # -----------------------------------------------------------------------
+    # Tool: skill (GAP-022 — progressive skill disclosure)
+    # -----------------------------------------------------------------------
+    @server.tool()
+    async def skill(
+        name: str = "",
+    ) -> list[TextContent]:
+        """Load full instructions for an HOI4 modding skill on demand.
+
+        Skills are listed by name + description in the system prompt. When a
+        task matches a skill's domain, call this tool with the skill name to
+        load its complete instructions. This keeps the system prompt lean while
+        making deep domain knowledge available when needed.
+
+        Available skills are discovered from .agents/skills/ in the project.
+
+        Args:
+            name: The skill name to load (e.g., 'hoi4-focus-trees', 'hoi4-events').
+                  Call with empty string to list all available skills.
+        """
+        # Build or retrieve the skill registry
+        # Use the workspace root (HOI4-MCP project) for skill discovery
+        workspace = Path(__file__).parent.parent.parent.parent  # src/hoi4_mcp -> project root
+        registry = build_skill_registry_for_tool(workspace)
+
+        if not name.strip():
+            # List mode — show all available skills
+            skills_list = []
+            for s in registry.all():
+                skills_list.append({
+                    "name": s.name,
+                    "description": s.description,
+                    "source": s.source,
+                })
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "available_skills": skills_list,
+                    "count": len(skills_list),
+                    "errors": registry.errors,
+                    "usage": "Call skill(name='<skill-name>') to load full instructions.",
+                }, indent=2)
+            )]
+
+        response_text = build_skill_tool_response(name, registry)
+        return [TextContent(type="text", text=response_text)]
+
+    # -----------------------------------------------------------------------
+    # Tool: get_loop_status (GAP-027 — autonomous validation loop status)
+    # -----------------------------------------------------------------------
+    @server.tool()
+    async def get_loop_status(
+        workspace_path: str = "",
+    ) -> list[TextContent]:
+        """Check the status of an autonomous mod validation loop.
+
+        The autonomous loop runs rounds of mod content generation + syntax
+        validation until the mod passes or circuit breakers fire. This tool
+        reads the durable loop state from disk.
+
+        Loop state is stored at <mod>/.hoi4_mcp/loop/state.json — inspectable
+        with any text editor, survives crashes and restarts.
+
+        Args:
+            workspace_path: Path to the mod workspace. If empty, uses the active mod path.
+        """
+        if not workspace_path and _has_mod():
+            workspace_path = str(_state["mod_path"])
+        if not workspace_path:
+            return [TextContent(
+                type="text",
+                text=_structured_error(
+                    "MISSING_WORKSPACE",
+                    "No workspace path provided and no mod is active."
+                )
+            )]
+
+        state = LoopState.load(workspace_path)
+        if state is None:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "found": False,
+                    "message": "No active loop found in this workspace. Start a loop by having the agent work toward a goal with validate_syntax backpressure.",
+                    "state_path": str(LoopState.path_for(workspace_path)),
+                }, indent=2)
+            )]
+
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "found": True,
+                "goal": state.goal,
+                "status": state.status,
+                "stop_reason": state.stop_reason,
+                "rounds_completed": state.round_count,
+                "max_rounds": state.max_rounds,
+                "is_terminal": state.is_terminal,
+                "last_round": {
+                    "index": state.last_round.index if state.last_round else None,
+                    "validation_passed": state.last_round.validation_passed if state.last_round else None,
+                    "validation_summary": state.last_round.validation_summary if state.last_round else "",
+                    "files_touched": state.last_round.files_touched if state.last_round else [],
+                } if state.last_round else None,
+                "state_path": str(LoopState.path_for(workspace_path)),
+            }, indent=2)
         )]
 
     # -----------------------------------------------------------------------
